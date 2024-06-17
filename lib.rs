@@ -45,23 +45,17 @@ mod TrabajoFinal {
     #[cfg_attr(feature = "std", derive(scale_info::TypeInfo, ink::storage::traits::StorageLayout))]
     struct Votante
     {
-        usuario:Usuario,
+        id:AccountId,
         voto_emitido:bool,
-    }
-
-    #[derive(scale::Decode, scale::Encode, Debug)]
-    #[cfg_attr(feature = "std", derive(scale_info::TypeInfo, ink::storage::traits::StorageLayout))]
-    struct Candidato
-    {
-        usuario:Usuario,
-        candidatura:String,
     }
 
     #[derive(scale::Decode, scale::Encode, Debug)]
     #[cfg_attr(feature = "std", derive(scale_info::TypeInfo, ink::storage::traits::StorageLayout))]
     struct CandidatoConteo
     {
-        candidato:Candidato,
+        id:AccountId,
+        candidato_id:u32,
+        candidatura:String,
         votos_totales:u32,
     }
 
@@ -74,8 +68,8 @@ mod TrabajoFinal {
         votantes:Vec<Votante>,
         usuarios:Vec<AccountId>,
         votacion_iniciada:bool,
-        fecha_inicio:i64,
-        fecha_final:i64,
+        fecha_inicio:u64,
+        fecha_final:u64,
     }
 
     impl Eleccion
@@ -160,7 +154,7 @@ mod TrabajoFinal {
             self.env().caller() == self.administrador
         }
 
-        /// Usado por un administrador.
+        /// Utilizado por un administrador.
         /// Crea una elección colocando fecha de inicio y final.
         #[ink(message)]
         pub fn crear_eleccion(&mut self, fecha_inicial:String, fecha_final:String) -> Result<String, String>
@@ -183,40 +177,84 @@ mod TrabajoFinal {
                 votantes: Vec::new(),
                 usuarios: Vec::new(),
                 votacion_iniciada:false,
-                fecha_inicio: fecha_inicial_milisegundos.unwrap().and_utc().timestamp_millis(),
-                fecha_final: fecha_final_milisegundos.unwrap().and_utc().timestamp_millis(),
+                fecha_inicio: fecha_inicial_milisegundos.unwrap().and_utc().timestamp_millis() as u64,
+                fecha_final: fecha_final_milisegundos.unwrap().and_utc().timestamp_millis() as u64,
             };
             self.elecciones.push(eleccion);
 
             return Ok(String::from("Eleccion creada exitosamente. Id de la elección: ") + &eleccion_id.to_string());
         }
 
+        /// Utilizado por los usuarios registrados en el sistema para poder ingresar a una elección.
+        /// Un usuario registrado y que no está registrado en la elección puede ingresar a la misma como candidato o votante.
+        /// Estos no pueden ingresar a la misma si esta ya comenzó su periodo de votación o ya terminó la elección.
+        /// Para ingresar como candidato es necesario una candidatura.
         #[ink(message)]
         pub fn ingresar_a_eleccion(&mut self, eleccion_id:u32, tipo:TIPO_DE_USUARIO, candidatura:Option<String>) -> Result<String, String>
         {
             if !self.es_usuario_registrado() { return Err(ERRORES::USUARIO_NO_REGISTRADO.to_string()); }
             let id = self.env().caller();
+
+            let block_timestamp = self.env().block_timestamp();
             let option_eleccion = self.obtener_eleccion_por_id(eleccion_id);
             if option_eleccion.is_none() { return Err(String::from("No existe una elección con ese id.")); }
             
             let eleccion = option_eleccion.unwrap();
             if eleccion.contiene_usuario(id) { return Err(String::from("Ya está registrado en la elección.")); }
+            
+            if eleccion.votacion_iniciada || eleccion.fecha_inicio < block_timestamp {
+                return Err(String::from("La votación en la elección ya comenzó, no te puedes registrar."));
+            }
+            if eleccion.fecha_final < block_timestamp {
+                return Err(String::from("La elección ya finalizó, no te puedes registrar."));
+            }
 
             match tipo
             {
                 TIPO_DE_USUARIO::VOTANTE => {
+                    eleccion.votantes.push(Votante { 
+                        id: id, 
+                        voto_emitido: false
+                    });
+
                     return Ok(String::from("Ingresó a la elección correctamente como votante."));
                 },
                 TIPO_DE_USUARIO::CANDIDATO => 
                 {
                     if candidatura.is_none() { return Err(String::from("Para ser candidato tiene que presentar una candidatura.")); }
+
+                    let candidato_id = 1 + eleccion.candidatos.len();
+                    eleccion.candidatos.push(CandidatoConteo { 
+                        id: id,
+                        candidato_id: candidato_id as u32,
+                        candidatura: candidatura.unwrap(), 
+                        votos_totales: 0 
+                    });
                     
-                    return Ok(String::from("Ingresó a la elección correctamente como candidato."));
+                    return Ok(String::from("Ingresó a la elección correctamente como candidato. Tu id de candidato es: ") + &candidato_id.to_string());
                 },
             }
         }
 
-        /// Usado por un Administrador.
+        /// Utilizado por los usuarios registrados en el sistema y que están en la elección como votantes.
+        /// Si el usuario ya emitió su voto, no puede volver a votar en la misma elección.
+        /// Si el usuario no es votante, no puede votar.
+        /// Si el periodo de la votación no comenzó o terminó, no puede votar.
+        #[ink(message)]
+        pub fn votar_a_candidato(&mut self, eleccion_id:u32, candidato_id:u32) -> Result<String, String>
+        {
+            todo!()
+        }
+
+        /// Utilizado por los usuarios registrados en el sistema y que están en la elección ingresada.
+        /// Se utiliza para poder obtener información de algún candidato en específico.
+        /// Las IDs de los candidatos van de 1 a N.
+        pub fn obtener_informacion_candidato(&self, eleccion_id:u32, candidato_id:u32) -> Result<String, String>
+        {
+            todo!()
+        }
+
+        /// Utilizado por un Administrador.
         /// Obtiene la información del próximo usuario a registrarse.
         #[ink(message)]
         pub fn obtener_informacion_siguiente_usuario_pendiente(&self) -> Result<String, String>
@@ -234,7 +272,7 @@ mod TrabajoFinal {
             }
         }
 
-        /// Usado por un Administrador.
+        /// Utilizado por un Administrador.
         /// Se procesará el próximo usuario pendiente.
         /// Para obtener la información del mismo, utilizar obtenerInformacionSiguienteUsuarioPendiente
         /// Si se acepta el usuario, podrá utilizar el sistema.
