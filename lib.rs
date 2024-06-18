@@ -140,11 +140,8 @@ mod TrabajoFinal {
 
         fn obtener_eleccion_por_id(&mut self, eleccion_id:u32) -> Option<&mut Eleccion>
         {
-            for eleccion in self.elecciones.iter_mut() {
-                if eleccion.id == eleccion_id
-                {
-                    return Some(eleccion);
-                }
+            if let Some(eleccion) = self.elecciones.iter_mut().find(|eleccion| eleccion.id == eleccion_id){
+                return Some(eleccion);
             }
             return None;
         }
@@ -153,7 +150,21 @@ mod TrabajoFinal {
         {
             self.env().caller() == self.administrador
         }
-
+        fn validar_estado_eleccion(&mut self,eleccion_id:u32,block_timestamp:u64,id_usuario:AccountId) -> Result<&mut Eleccion,String>{
+            let option_eleccion = self.obtener_eleccion_por_id(eleccion_id);
+            if option_eleccion.is_none() { return Err(String::from("No existe una elección con ese id.")); }
+            
+            let eleccion = option_eleccion.unwrap();
+            if eleccion.contiene_usuario(id_usuario) { return Err(String::from("Ya está registrado en la elección.")); }
+            
+            if eleccion.votacion_iniciada || eleccion.fecha_inicio < block_timestamp {
+                return Err(String::from("La votación en la elección ya comenzó, no te puedes registrar."));
+            }
+            if eleccion.fecha_final < block_timestamp {
+                return Err(String::from("La elección ya finalizó, no te puedes registrar."));
+            }
+            Ok(eleccion)
+        }
         /// Utilizado por un administrador.
         /// Crea una elección colocando fecha de inicio y final.
         #[ink(message)]
@@ -190,52 +201,51 @@ mod TrabajoFinal {
         /// Estos no pueden ingresar a la misma si esta ya comenzó su periodo de votación o ya terminó la elección.
         /// Para ingresar como candidato es necesario una candidatura.
         #[ink(message)]
-        pub fn ingresar_a_eleccion(&mut self, eleccion_id:u32, tipo:TIPO_DE_USUARIO, candidatura:Option<String>) -> Result<String, String>
+        pub fn ingresar_como_votante(&mut self, eleccion_id:u32, tipo:TIPO_DE_USUARIO) -> Result<String, String>
         {
+            match tipo {
+                TIPO_DE_USUARIO::CANDIDATO => return Err(String::from("No puede ingresar como votante.")),
+                TIPO_DE_USUARIO::VOTANTE => ()
+            }
+            if !self.es_usuario_registrado() { return Err(ERRORES::USUARIO_NO_REGISTRADO.to_string()); }
+            let id = self.env().caller();
+            let block_timestamp = self.env().block_timestamp();
+            let result =  self.validar_estado_eleccion(eleccion_id, block_timestamp, id);
+            let eleccion = match result{
+                Ok(eleccion) => eleccion,
+                Err(mensaje) => return Err(mensaje)
+            };
+            eleccion.votantes.push(Votante{ 
+                id, 
+                voto_emitido: false
+            });
+            Ok(String::from("Ingresó a la elección correctamente como votante."))
+        }
+        pub fn ingresar_como_candidato(&mut self, eleccion_id:u32, tipo:TIPO_DE_USUARIO, candidatura:Option<String>) -> Result<String,String>{
+            match tipo{
+                TIPO_DE_USUARIO::VOTANTE => return Err(String::from("No puede ingresar como candidato.")),
+                TIPO_DE_USUARIO::CANDIDATO =>()
+            }
+            if candidatura.is_none() || candidatura.clone().is_some_and(|string| string.is_empty()) { return Err(String::from("Para ser candidato tiene que presentar una candidatura.")); }
+            
             if !self.es_usuario_registrado() { return Err(ERRORES::USUARIO_NO_REGISTRADO.to_string()); }
             let id = self.env().caller();
 
             let block_timestamp = self.env().block_timestamp();
-            let option_eleccion = self.obtener_eleccion_por_id(eleccion_id);
-            if option_eleccion.is_none() { return Err(String::from("No existe una elección con ese id.")); }
-            
-            let eleccion = option_eleccion.unwrap();
-            if eleccion.contiene_usuario(id) { return Err(String::from("Ya está registrado en la elección.")); }
-            
-            if eleccion.votacion_iniciada || eleccion.fecha_inicio < block_timestamp {
-                return Err(String::from("La votación en la elección ya comenzó, no te puedes registrar."));
-            }
-            if eleccion.fecha_final < block_timestamp {
-                return Err(String::from("La elección ya finalizó, no te puedes registrar."));
-            }
-
-            match tipo
-            {
-                TIPO_DE_USUARIO::VOTANTE => {
-                    eleccion.votantes.push(Votante { 
-                        id: id, 
-                        voto_emitido: false
-                    });
-
-                    return Ok(String::from("Ingresó a la elección correctamente como votante."));
-                },
-                TIPO_DE_USUARIO::CANDIDATO => 
-                {
-                    if candidatura.is_none() { return Err(String::from("Para ser candidato tiene que presentar una candidatura.")); }
-
-                    let candidato_id = 1 + eleccion.candidatos.len();
-                    eleccion.candidatos.push(CandidatoConteo { 
-                        id: id,
-                        candidato_id: candidato_id as u32,
-                        candidatura: candidatura.unwrap(), 
-                        votos_totales: 0 
-                    });
-                    
-                    return Ok(String::from("Ingresó a la elección correctamente como candidato. Tu id de candidato es: ") + &candidato_id.to_string());
-                },
-            }
+            let result =  self.validar_estado_eleccion(eleccion_id, block_timestamp, id);
+            let eleccion = match result{
+                Ok(eleccion) => eleccion,
+                Err(mensaje) => return Err(mensaje)
+            };
+            let candidato_id = 1 + eleccion.candidatos.len();
+            eleccion.candidatos.push(CandidatoConteo { 
+                id,
+                candidato_id: candidato_id as u32,
+                candidatura: candidatura.unwrap(), 
+                votos_totales: 0 
+            });  
+            Ok(String::from("Ingresó a la elección correctamente como candidato. Tu id de candidato es: ") + &candidato_id.to_string())
         }
-
         /// Utilizado por los usuarios registrados en el sistema y que están en la elección como votantes.
         /// Si el usuario ya emitió su voto, no puede volver a votar en la misma elección.
         /// Si el usuario no es votante, no puede votar.
