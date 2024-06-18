@@ -78,6 +78,15 @@ mod TrabajoFinal {
         {
             self.usuarios.contains(&id)
         }
+
+	/// Recibe la ID de un candidato y devuelve un option con la informacion de la candidatura
+	fn obtener_candidatura_por_id(&self, id_candidato: AccountId) -> Option(String) {
+		let candidato = vec.iter().find(|&self.candidatos | candidato.id == id_candidato );
+		if candidato != None {
+			return Some(candidato.unwrap().candidatura);
+		}
+		return None;
+	}
     }
 
     #[ink(storage)]
@@ -249,9 +258,23 @@ mod TrabajoFinal {
         /// Utilizado por los usuarios registrados en el sistema y que están en la elección ingresada.
         /// Se utiliza para poder obtener información de algún candidato en específico.
         /// Las IDs de los candidatos van de 1 a N.
+	#[ink(message)]
         pub fn obtener_informacion_candidato(&self, eleccion_id:u32, candidato_id:u32) -> Result<String, String>
         {
-            todo!()
+		let id_usuario = self.env().caller();
+		let eleccion = obtener_eleccion_por_id(eleccion_id);
+		if eleccion == None {
+			return Err(String::from("La eleccion ingresada no existe.")
+		}
+		eleccion = eleccion.unwrap();
+		if !eleccion.votantes.contiene_usuario(id_usuario) {
+			return Err(String::from("No estas registrado en esta eleccion.")
+		}
+		let candidato = obtener_candidatura_por_id(candidato_id);
+		if candidato == None {
+			return Err(String::from("El candidato ingresado no existe.")
+		}
+		return Ok(candidato.unwrap() );
         }
 
         /// Utilizado por un Administrador.
