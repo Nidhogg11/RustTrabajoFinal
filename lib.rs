@@ -81,9 +81,9 @@ mod TrabajoFinal {
 
 	/// Recibe la ID de un candidato y devuelve un option con la informacion de la candidatura
 	fn obtener_candidatura_por_id(&self, id_candidato: AccountId) -> Option(String) {
-		let candidato = vec.iter().find(|&self.candidatos | candidato.id == id_candidato );
+		let candidato = self.candidatos.iter().find(|&candidato | candidato.id == id_candidato );
 		if candidato != None {
-			return Some(candidato.unwrap().candidatura);
+			return Some(candidato.unwrap().candidatura.clone() );
 		}
 		return None;
 	}
