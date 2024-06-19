@@ -105,12 +105,12 @@ mod TrabajoFinal {
                     });
                    },
                    }
-                self.usuarios_pendientes.remove(0);
                 return Ok(String::from("Usuario agregado exitosamente."));
             }
-
-            self.usuarios_rechazados.push(usuario);
-            return Ok(String::from("Usuario rechazado exitosamente."));
+            else{
+                self.usuarios_rechazados.push(usuario);
+                return Ok(String::from("Usuario rechazado exitosamente."));
+            }
         }
     }
 
@@ -225,18 +225,16 @@ mod TrabajoFinal {
             let id = self.env().caller();
 
             let block_timestamp = self.env().block_timestamp();
-            let option_eleccion = self.obtener_eleccion_por_id(eleccion_id);
-            if option_eleccion.is_none() { return Err(String::from("No existe una elección con ese id.")); }
+            let result = self.validar_estado_eleccion(eleccion_id, block_timestamp, id);
+            let eleccion = match result {
+                Ok(eleccion) => eleccion,
+                Err(mensaje) => return Err(mensaje)
+            };
+            //Validar que un usuario que ya ha sido rechazado en la misma eleccion no intente volver a ponerse como pendiente 
+            if eleccion.usuarios_rechazados.contains(&id) {return Err("Ya has sido rechazado no puedes ingresar a la eleccion".to_string())}
             
-            let eleccion = option_eleccion.unwrap();
-            if eleccion.contiene_usuario(id) { return Err(String::from("Ya está registrado en la elección.")); }
-            
-            if eleccion.votacion_iniciada || eleccion.fecha_inicio < block_timestamp {
-                return Err(String::from("La votación en la elección ya comenzó, no te puedes registrar."));
-            }
-            if eleccion.fecha_final < block_timestamp {
-                return Err(String::from("La elección ya finalizó, no te puedes registrar."));
-            }
+            if eleccion.contiene_usuario(id){return Err("No puedes ingresar dos veces a la misma eleccion".to_string())}
+
             eleccion.usuarios_pendientes.push((id,tipo));
 
             return Ok(format!("Ingresó a la elección correctamente Pendiente de aprobacion del Administrador"));
