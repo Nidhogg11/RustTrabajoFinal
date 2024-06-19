@@ -105,7 +105,6 @@ mod TrabajoFinal {
                     });
                    },
                    }
-                self.usuarios_pendientes.remove(0);
                 return Ok(String::from("Usuario agregado exitosamente."));
             }
 
