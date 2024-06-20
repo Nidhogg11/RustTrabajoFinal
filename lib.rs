@@ -150,7 +150,10 @@ mod TrabajoFinal {
 
         fn existe_eleccion(&self, eleccion_id:u32) -> bool
         {
-            self.elecciones.iter().any(|eleccion| eleccion.id == eleccion_id)
+		if eleccion_id >= 1 && eleccion_id <= self.elecciones.len() {
+			return true;
+		}
+		return false;
         }
 
         fn obtener_eleccion_por_id(&mut self, eleccion_id:u32) -> Option<&mut Eleccion>
@@ -334,8 +337,13 @@ mod TrabajoFinal {
             return Ok(String::from("Registro exitoso. Se te añadió en la cola de usuarios pendientes."));
         }
 
+	// Version simplificada sin iteradores. Cuando se crea una eleccion, se le asigna el ID len()+1 y se pushea. Podemos revisar que el ID tenga un numero
+	// valido y devolver esa eleccion por indice (ID - 1)
         fn buscar_eleccion_por_id(&mut self, eleccion_id: u32) -> Option<&mut Eleccion> {
-            self.elecciones.iter_mut().find(|eleccion| eleccion.id == eleccion_id)
+		if self.existe_eleccion(eleccion_id) {
+			return Some(&mut self.elecciones[eleccion_id - 1]);
+		}
+		return None;
         }
     
          /// Utilizado por un Administrador.
