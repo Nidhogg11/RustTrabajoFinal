@@ -1,12 +1,12 @@
 ### To-Do List
 
-- [x] Registrase (Usuario) :white_check_mark: 
-- [x] Obtener información de siguiente usuario a registrar (Administrador) :white_check_mark: 
-- [x] Confirmar registro (Administrador) :white_check_mark: 
-- [x] Crear elección (Administrador) :white_check_mark: 
-- [x] Registrarse en elección (Usuario) :white_check_mark: 
-- [x] Obtener información de siguiente usuario a registrar en elección (Administrador) :white_check_mark: 
-- [ ] Confirmar registro en elección (Administrador) :white_check_mark: 
+- [x] Registrase (Usuario)
+- [x] Obtener información de siguiente usuario a registrar (Administrador)
+- [x] Confirmar registro (Administrador)
+- [x] Crear elección (Administrador)
+- [x] Registrarse en elección (Usuario)
+- [x] Obtener información de siguiente usuario a registrar en elección (Administrador)
+- [x] Confirmar registro en elección (Administrador)
 - [ ] Iniciar votación en elección (Administrador) [Dato: Esto no está especificado en el trabajo final, pero el profesor me lo recomendó que si la votación no comenzó y es fecha el administrador puede comenzarla, pero la votación se debería de iniciar automáticamente cuando se reciba un voto y sea el tiempo adecuado (esté entre en rango de tiempo)]
 - [ ] Votar candidato en elección (Votante)
 - [ ] Transferir administrador (Administrador)
