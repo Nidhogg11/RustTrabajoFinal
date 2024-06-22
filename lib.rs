@@ -1,4 +1,6 @@
 #![cfg_attr(not(feature = "std"), no_std, no_main)]
+#[allow(non_camel_case_types)]
+#[allow(non_snake_case)]
 
 #[ink::contract]
 mod TrabajoFinal {
@@ -9,6 +11,16 @@ mod TrabajoFinal {
     {
         NO_ES_ADMINISTRADOR,
         USUARIO_NO_REGISTRADO,
+    }
+
+    #[derive(scale::Decode, scale::Encode, Debug)]
+    #[cfg_attr(feature = "std", derive(scale_info::TypeInfo, ink::storage::traits::StorageLayout,PartialEq,Clone))]
+    pub enum ESTADO_ELECCION
+    {
+        CERRADA,
+        ABIERTA,
+        INICIADA,
+        FINALIZADA
     }
 
     #[derive(scale::Decode, scale::Encode, Debug)]
@@ -67,7 +79,7 @@ mod TrabajoFinal {
         votantes:Vec<Votante>,
         usuarios_rechazados:Vec<AccountId>,
         usuarios_pendientes:Vec<(AccountId,TIPO_DE_USUARIO)>,
-        votacion_iniciada:bool,
+        estado: ESTADO_ELECCION, 
         fecha_inicio:u64,
         fecha_final:u64,
     }
@@ -150,7 +162,7 @@ mod TrabajoFinal {
 
         fn existe_eleccion(&self, eleccion_id:u32) -> bool
         {
-		if eleccion_id >= 1 && eleccion_id <= self.elecciones.len() {
+		if eleccion_id >= 1 && eleccion_id <= self.elecciones.len() as u32 {
 			return true;
 		}
 		return false;
@@ -159,7 +171,7 @@ mod TrabajoFinal {
         fn obtener_eleccion_por_id(&mut self, eleccion_id:u32) -> Option<&mut Eleccion>
         {
                 if self.existe_eleccion(eleccion_id) {
-                        return Some(&mut self.elecciones[eleccion_id - 1]);
+                        return Some(&mut self.elecciones[(eleccion_id - 1) as usize]);
                 }
                 return None;
         }
@@ -177,7 +189,7 @@ mod TrabajoFinal {
             let eleccion = option_eleccion.unwrap();
             if eleccion.contiene_usuario(id_usuario) { return Err(String::from("Ya está registrado en la elección.")); }
             
-            if eleccion.votacion_iniciada || eleccion.fecha_inicio < block_timestamp {
+            if eleccion.estado == ESTADO_ELECCION::ABIERTA || eleccion.fecha_inicio < block_timestamp {
                 return Err(String::from("La votación en la elección ya comenzó, no te puedes registrar."));
             }
             if eleccion.fecha_final < block_timestamp {
@@ -185,6 +197,11 @@ mod TrabajoFinal {
             }
             Ok(eleccion)
         }
+
+
+    // ===================================================================================================
+    // =========================creacion y administracion de estados de elecciones========================
+    // ===================================================================================================
 
         /// Utilizado por un administrador.
         /// Crea una elección colocando fecha de inicio y final.
@@ -209,7 +226,7 @@ mod TrabajoFinal {
                 votantes: Vec::new(),
                 usuarios_pendientes: Vec::new(),
                 usuarios_rechazados: Vec::new(),
-                votacion_iniciada:false,
+                estado: ESTADO_ELECCION::CERRADA,
                 fecha_inicio: fecha_inicial_milisegundos.unwrap().and_utc().timestamp_millis() as u64,
                 fecha_final: fecha_final_milisegundos.unwrap().and_utc().timestamp_millis() as u64,
             };
@@ -218,15 +235,102 @@ mod TrabajoFinal {
             return Ok(String::from("Eleccion creada exitosamente. Id de la elección: ") + &eleccion_id.to_string());
         }
 
-        /// Utilizado por los usuarios registrados en el sistema para poder ingresar a una elección.
-        /// Un usuario registrado y que no está registrado en la elección puede ingresar a la misma como candidato o votante.
-        /// Estos no pueden ingresar a la misma si esta ya comenzó su periodo de votación o ya terminó la elección.
-        /// Para ingresar como candidato es necesario una candidatura.
-       
+        /// Utilizado por un administrador.
+        /// cierra una elección colocando su estado en CERRADO (estado anterior al INICIADA).
+        #[ink(message)]
+        pub fn cerrar_eleccion(&mut self, eleccion_id: u32) -> Result<String, String>
+        {
+            if !self.es_administrador() { return Err(ERRORES::NO_ES_ADMINISTRADOR.to_string()); }
+            let eleccion_option = self.obtener_eleccion_por_id(eleccion_id);
+            match eleccion_option {
+                Some(eleccion) => {
+                    if eleccion.estado == ESTADO_ELECCION::CERRADA {
+                        return Err(String::from("La eleccion ya se encuantra en el estado correspondiente!"))
+                    }
+                    eleccion.estado = ESTADO_ELECCION::CERRADA;
+                    return Ok(String::from("Eleccion cerrada exitosamente. Id de la elección: ") + &eleccion.id.to_string());
+                },
+                None => return Err(String::from("La eleccion enviada no existe!")),
+            };
+        }
+        /// Utilizado por un administrador.
+        /// cierra una elección colocando su estado en CERRADO (estado anterior al INICIADA).
+        #[ink(message)]
+        pub fn abrir_eleccion(&mut self, eleccion_id: u32) -> Result<String, String>
+        {
+            if !self.es_administrador() { return Err(ERRORES::NO_ES_ADMINISTRADOR.to_string()); }
+            let eleccion_option = self.obtener_eleccion_por_id(eleccion_id);
+            match eleccion_option {
+                Some(eleccion) => {
+                    if eleccion.estado == ESTADO_ELECCION::CERRADA {
+                        return Err(String::from("La eleccion ya se encuantra en el estado correspondiente!"))
+                    }
+                    eleccion.estado = ESTADO_ELECCION::CERRADA;
+                    return Ok(String::from("Eleccion cerrada exitosamente. Id de la elección: ") + &eleccion.id.to_string());
+                },
+                None => return Err(String::from("La eleccion enviada no existe!")),
+            };
+        }
+        /// Utilizado por un administrador.
+        /// cierra una elección colocando su estado en CERRADO (estado anterior al INICIADA).
+        #[ink(message)]
+        pub fn iniciar_eleccion(&mut self, eleccion_id: u32) -> Result<String, String>
+        {
+            if !self.es_administrador() { return Err(ERRORES::NO_ES_ADMINISTRADOR.to_string()); }
+            let eleccion_option = self.obtener_eleccion_por_id(eleccion_id);
+            match eleccion_option {
+                Some(eleccion) => {
+                    if eleccion.estado == ESTADO_ELECCION::CERRADA {
+                        return Err(String::from("La eleccion ya se encuantra en el estado correspondiente!"))
+                    }
+                    eleccion.estado = ESTADO_ELECCION::CERRADA;
+                    return Ok(String::from("Eleccion cerrada exitosamente. Id de la elección: ") + &eleccion.id.to_string());
+                },
+                None => return Err(String::from("La eleccion enviada no existe!")),
+            };
+        }
+        /// Utilizado por un administrador.
+        /// cierra una elección colocando su estado en CERRADO (estado anterior al INICIADA).
+        #[ink(message)]
+        pub fn finalizar_eleccion(&mut self, eleccion_id: u32) -> Result<String, String>
+        {
+            if !self.es_administrador() { return Err(ERRORES::NO_ES_ADMINISTRADOR.to_string()); }
+            let eleccion_option = self.obtener_eleccion_por_id(eleccion_id);
+            match eleccion_option {
+                Some(eleccion) => {
+                    if eleccion.estado == ESTADO_ELECCION::CERRADA {
+                        return Err(String::from("La eleccion ya se encuantra en el estado correspondiente!"))
+                    }
+                    eleccion.estado = ESTADO_ELECCION::CERRADA;
+                    return Ok(String::from("Eleccion cerrada exitosamente. Id de la elección: ") + &eleccion.id.to_string());
+                },
+                None => return Err(String::from("La eleccion enviada no existe!")),
+            };
+        }
+
+        /// Utilizado por un administrador.
+        /// cierra una elección colocando su estado en CERRADO (estado anterior al INICIADA).
+        #[ink(message)]
+        pub fn obtener_elecciones(&self) -> Vec<u32>
+        {
+            self.elecciones.iter().map(|eleccion| eleccion.id).collect()
+        }
+
+    // ====================================================================
+    // ====================================================================
+    // ====================================================================
+
         
+        // Utilizado por los usuarios registrados en el sistema para poder ingresar a una elección.
+        // Un usuario registrado y que no está registrado en la elección puede ingresar a la misma como candidato o votante.
+        // Estos no pueden ingresar a la misma si esta ya comenzó su periodo de votación o ya terminó la elección.
+        // Para ingresar como candidato es necesario una candidatura. 
         #[ink(message)]
         pub fn ingresar_a_eleccion(&mut self, eleccion_id:u32, tipo:TIPO_DE_USUARIO) -> Result<String, String>
         {
+            // es usuario valido en el sistema (no esta pendiente de aprobacion y no esta rechazado)
+            // no está registrado en la elección
+            // el estado de la eleccion es PENDIENTE
             if !self.es_usuario_registrado() { return Err(ERRORES::USUARIO_NO_REGISTRADO.to_string()); }
             let id = self.env().caller();
 
@@ -239,13 +343,14 @@ mod TrabajoFinal {
             //Validar que un usuario que ya ha sido rechazado en la misma eleccion no intente volver a ponerse como pendiente 
             if eleccion.usuarios_rechazados.contains(&id) {return Err("Ya has sido rechazado no puedes ingresar a la eleccion".to_string())}
             
-            if eleccion.contiene_usuario(id){return Err("No puedes ingresar dos veces a la misma eleccion".to_string())}
+            if eleccion.contiene_usuario(id){return Err("No puedes ingresar dos veces a la misma eleccion".to_string())} // esto no esta contemplado ya en el validar eleccion?
 
             eleccion.usuarios_pendientes.push((id,tipo));
 
             return Ok(format!("Ingresó a la elección correctamente Pendiente de aprobacion del Administrador"));
               
         }
+
         /// Utilizado por los usuarios registrados en el sistema y que están en la elección como votantes.
         /// Si el usuario ya emitió su voto, no puede volver a votar en la misma elección.
         /// Si el usuario no es votante, no puede votar.
@@ -307,7 +412,7 @@ mod TrabajoFinal {
         /// Utilizado por un administrador.
         /// Activa el registro de usuarios si no está activo el registro.
         #[ink(message)]
-        pub fn activar_registro(&mut self) -> Result<String, String>
+        pub fn activar_registro(&mut self) -> Result<String, String> 
         {
             if !self.es_administrador() { return Err(ERRORES::NO_ES_ADMINISTRADOR.to_string()); }
             if self.registro_activado { return Err(String::from("El registro ya está activado.")); }
@@ -344,7 +449,7 @@ mod TrabajoFinal {
         /// Se procesará el próximo usuario pendiente en una eleccion particular.
         /// y se lo coloca en el vector de candidato o votante en esa eleccion segun que quiera ser.
         pub fn procesar_usuarios_en_una_eleccion(&mut self, eleccion_id:u32,aceptar_usuario:bool) -> Result<String, String>
-            {
+        {
                 if !self.es_administrador() { return Err(ERRORES::NO_ES_ADMINISTRADOR.to_string()); }
 
                let eleccion_elegida = match self.obtener_eleccion_por_id(eleccion_id) {
@@ -352,7 +457,7 @@ mod TrabajoFinal {
                 None => return Err(String::from("Eleccion no encontrada")),
             };
             return eleccion_elegida.procesar_siguiente_usuario_pendiente(aceptar_usuario);
-                
+
             
         }
     }
