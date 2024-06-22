@@ -1,6 +1,4 @@
 #![cfg_attr(not(feature = "std"), no_std, no_main)]
-#[allow(non_camel_case_types)]
-#[allow(non_snake_case)]
 
 #[ink::contract]
 mod TrabajoFinal {
@@ -132,7 +130,7 @@ mod TrabajoFinal {
         registro_activado:bool,
         usuarios:Vec<Usuario>,
         usuarios_pendientes:Vec<Usuario>,
-        usuarios_rechazados:Vec<AccountId>,
+        usuarios_rechazados:Vec<Usuario>,
         elecciones:Vec<Eleccion>,
     }
 
@@ -149,31 +147,52 @@ mod TrabajoFinal {
             }
         }
 
-        fn es_usuario_registrado(&self) -> bool {
+        fn es_usuario_registrado(&self, id: AccountId) -> bool {
             let id = self.env().caller();
             self.usuarios.iter().any(|usuario| usuario.id == id)
         }
-
-        fn es_usuario_pendiente(&self) -> bool
-        {
+        fn es_usuario_pendiente(&self, id: AccountId) -> bool {
             let id=self.env().caller();
             self.usuarios_pendientes.iter().any(|usuario| usuario.id == id)
+        }
+        fn es_usuario_rechazado(&self, id: AccountId) -> bool {
+            let id=self.env().caller();
+            self.usuarios_rechazados.iter().any(|usuario| usuario.id == id)
+        }
+
+        fn obtener_usuario_por_id(&mut self, id_usuario: AccountId) -> Option<&Usuario> {
+            if self.es_usuario_registrado(id_usuario) { 
+                    return self.usuarios.iter().find(|user| user.id == id_usuario);
+            }
+            return None;
+        }
+        fn obtener_usuario_pendiente_por_id(&mut self, id_usuario: AccountId) -> Option<&Usuario> {
+            if self.es_usuario_pendiente(id_usuario) { 
+                return self.usuarios_pendientes.iter().find(|user| user.id == id_usuario);
+            }
+            return None;
+        }
+        fn obtener_usuario_rechazado_por_id(&mut self, id_usuario: AccountId) -> Option<&Usuario> {
+            if self.es_usuario_rechazado(id_usuario) { 
+                return self.usuarios_rechazados.iter().find(|user| user.id == id_usuario);
+            }
+            return None;
         }
 
         fn existe_eleccion(&self, eleccion_id:u32) -> bool
         {
-		if eleccion_id >= 1 && eleccion_id <= self.elecciones.len() as u32 {
-			return true;
-		}
-		return false;
+            if eleccion_id >= 1 && eleccion_id <= self.elecciones.len() as u32 {
+                return true;
+            }
+            return false;
         }
 
         fn obtener_eleccion_por_id(&mut self, eleccion_id:u32) -> Option<&mut Eleccion>
         {
-                if self.existe_eleccion(eleccion_id) {
-                        return Some(&mut self.elecciones[(eleccion_id - 1) as usize]);
-                }
-                return None;
+            if self.existe_eleccion(eleccion_id) {
+                    return Some(&mut self.elecciones[(eleccion_id - 1) as usize]);
+            }
+            return None;
         }
 
         fn es_administrador(&self) -> bool
@@ -308,10 +327,8 @@ mod TrabajoFinal {
             };
         }
 
-        /// Utilizado por un administrador.
-        /// cierra una elección colocando su estado en CERRADO (estado anterior al INICIADA).
         #[ink(message)]
-        pub fn obtener_elecciones(&self) -> Vec<u32>
+        pub fn obtener_ids_elecciones(&self) -> Vec<u32>
         {
             self.elecciones.iter().map(|eleccion| eleccion.id).collect()
         }
@@ -331,8 +348,8 @@ mod TrabajoFinal {
             // es usuario valido en el sistema (no esta pendiente de aprobacion y no esta rechazado)
             // no está registrado en la elección
             // el estado de la eleccion es PENDIENTE
-            if !self.es_usuario_registrado() { return Err(ERRORES::USUARIO_NO_REGISTRADO.to_string()); }
             let id = self.env().caller();
+            if !self.es_usuario_registrado(id) { return Err(ERRORES::USUARIO_NO_REGISTRADO.to_string()); }
 
             let block_timestamp = self.env().block_timestamp();
             let result = self.validar_estado_eleccion(eleccion_id, block_timestamp, id);
@@ -355,18 +372,42 @@ mod TrabajoFinal {
         /// Si el usuario ya emitió su voto, no puede volver a votar en la misma elección.
         /// Si el usuario no es votante, no puede votar.
         /// Si el periodo de la votación no comenzó o terminó, no puede votar.
-        #[ink(message)]
-        pub fn votar_a_candidato(&mut self, eleccion_id:u32, candidato_id:u32) -> Result<String, String>
-        {
-            todo!()
-        }
+        // #[ink(message)]
+        // pub fn votar_a_candidato(&mut self, eleccion_id:u32, candidato_id:u32) -> Result<String, String>
+        // {
+        //     todo!()
+        // }
 
         /// Utilizado por los usuarios registrados en el sistema y que están en la elección ingresada.
         /// Se utiliza para poder obtener información de algún candidato en específico.
         /// Las IDs de los candidatos van de 1 a N.
-        pub fn obtener_informacion_candidato(&self, eleccion_id:u32, candidato_id:u32) -> Result<String, String>
+        // pub fn obtener_informacion_candidato(&self, eleccion_id:u32, candidato_id:u32) -> Result<String, String>
+        // {
+        //     todo!()
+        // }
+
+
+    // ===================================================================================================
+    // =========================creacion y administracion de usuarios========================
+    // ===================================================================================================
+
+        /// Utilizado por los usuarios para poder registrarse en el sistema.
+        /// Luego de registrarse queda pendiente de aceptación por parte de un Administrador.
+        /// Si tu registro es rechazado, no podrás volver a intentar registrarte.
+        #[ink(message)]
+        pub fn registrarse(&mut self, nombre:String, apellido:String, dni:String) -> Result<String, String>
         {
-            todo!()
+            if !self.registro_activado { return Err(String::from("El registro todavía no está activado.")); }
+            if self.es_administrador() { return Err(String::from("Eres el administrador, no puedes registrarte.")); }
+
+            let id = self.env().caller();
+            if self.es_usuario_rechazado(id) {  return Err(String::from("Tu solicitud de registro ya fue rechazada.")); }
+            if self.es_usuario_registrado(id) { return Err(String::from("Ya estás registrado como usuario.")); }
+            if self.es_usuario_pendiente(id) { return Err(String::from("Ya estás en la cola de usuarios pendientes.")); }
+
+            let usuario = Usuario { id, nombre, apellido, dni };
+            self.usuarios_pendientes.push(usuario);
+            return Ok(String::from("Registro exitoso. Se te añadió en la cola de usuarios pendientes."));
         }
 
         /// Utilizado por un Administrador.
@@ -405,9 +446,71 @@ mod TrabajoFinal {
                 return Ok(String::from("Usuario agregado exitosamente."));
             }
 
-            self.usuarios_rechazados.push(usuario.id);
+            self.usuarios_rechazados.push(usuario);
             return Ok(String::from("Usuario rechazado exitosamente."));
         }
+
+
+       
+        #[ink(message)]
+        pub fn obtener_usuarios_pendientes(&self) -> Vec<AccountId>
+        {
+            self.usuarios_pendientes.iter().map(|usuario| usuario.id).collect()
+        }
+        #[ink(message)]
+        pub fn obtener_usuarios_rechazados(&self) -> Vec<AccountId>
+        {
+            self.usuarios_rechazados.iter().map(|usuario| usuario.id).collect()
+        }
+        #[ink(message)]
+        pub fn obtener_usuarios(&self) -> Vec<AccountId>
+        {
+            self.usuarios.iter().map(|usuario| usuario.id).collect()
+        }
+
+        #[ink(message)]
+        pub fn obtener_datos_usuario_por_id(&mut self, id_usuario: AccountId) -> Result<String, String> 
+        {
+            let sig_usuario = self.obtener_usuario_por_id(id_usuario);
+            match sig_usuario {
+                Some(usuario) => {
+                    let mut str = String::from("Nombre: ") + usuario.nombre.as_str();
+                    str.push_str((String::from("\nApellido: ") + usuario.apellido.as_str()).as_str());
+                    str.push_str((String::from("\nDNI: ") + usuario.apellido.as_str()).as_str());
+                    return Ok(str);
+                },
+                None => Err(String::from("No hay usuarios con tal id.")),
+            }
+        }
+        #[ink(message)]
+        pub fn obtener_datos_usuario_pendiente_por_id(&mut self, id_usuario: AccountId) -> Result<String, String> 
+        {
+            let sig_usuario = self.obtener_usuario_por_id(id_usuario);
+            match sig_usuario {
+                Some(usuario) => {
+                    let mut str = String::from("Nombre: ") + usuario.nombre.as_str();
+                    str.push_str((String::from("\nApellido: ") + usuario.apellido.as_str()).as_str());
+                    str.push_str((String::from("\nDNI: ") + usuario.apellido.as_str()).as_str());
+                    return Ok(str);
+                },
+                None => Err(String::from("No hay usuarios con tal id.")),
+            }
+        }
+        #[ink(message)]
+        pub fn obtener_datos_usuario_rechazado_por_id(&mut self, id_usuario: AccountId) -> Result<String, String> 
+        {
+            let sig_usuario = self.obtener_usuario_por_id(id_usuario);
+            match sig_usuario {
+                Some(usuario) => {
+                    let mut str = String::from("Nombre: ") + usuario.nombre.as_str();
+                    str.push_str((String::from("\nApellido: ") + usuario.apellido.as_str()).as_str());
+                    str.push_str((String::from("\nDNI: ") + usuario.apellido.as_str()).as_str());
+                    return Ok(str);
+                },
+                None => Err(String::from("No hay usuarios con tal id.")),
+            }
+        }
+
 
         /// Utilizado por un administrador.
         /// Activa el registro de usuarios si no está activo el registro.
@@ -419,33 +522,27 @@ mod TrabajoFinal {
             self.registro_activado = true;
             return Ok(String::from("Se activó el registro para los usuarios."));
         }
-
-        /// Utilizado por los usuarios para poder registrarse en el sistema.
-        /// Luego de registrarse queda pendiente de aceptación por parte de un Administrador.
-        /// Si tu registro es rechazado, no podrás volver a intentar registrarte.
+        /// Utilizado por un administrador.
+        /// Desactiva el registro de usuarios si no está activo el registro.
         #[ink(message)]
-        pub fn registrarse(&mut self, nombre:String, apellido:String, dni:String) -> Result<String, String>
+        pub fn desactivar_registro(&mut self) -> Result<String, String> 
         {
-            if !self.registro_activado { return Err(String::from("El registro todavía no está activado.")); }
-            let id = self.env().caller();
-            if self.es_administrador() { return Err(String::from("Eres el administrador, no puedes registrarte.")); }
-            if self.usuarios_rechazados.contains(&id) { 
-                return Err(String::from("Tu solicitud de registro ya fue rechazada."));
-            }
-            if self.es_usuario_registrado()
-            {
-                return Err(String::from("Ya estás registrado como usuario."));
-            }
-            if self.es_usuario_pendiente()
-            {
-                return Err(String::from("Ya estás en la cola de usuarios pendientes."));    
-            }
-            let usuario = Usuario { id, nombre, apellido, dni };
-            self.usuarios_pendientes.push(usuario);
-            return Ok(String::from("Registro exitoso. Se te añadió en la cola de usuarios pendientes."));
+            if !self.es_administrador() { return Err(ERRORES::NO_ES_ADMINISTRADOR.to_string()); }
+            if !self.registro_activado { return Err(String::from("El registro ya está desactivado.")); }
+            self.registro_activado = false;
+            return Ok(String::from("Se desactivó el registro para los usuarios."));
         }
 
-         /// Utilizado por un Administrador.
+
+    // ===================================================================================================
+    // ===================================================================================================
+    // ===================================================================================================
+
+
+
+
+
+        /// Utilizado por un Administrador.
         /// Se procesará el próximo usuario pendiente en una eleccion particular.
         /// y se lo coloca en el vector de candidato o votante en esa eleccion segun que quiera ser.
         pub fn procesar_usuarios_en_una_eleccion(&mut self, eleccion_id:u32,aceptar_usuario:bool) -> Result<String, String>
