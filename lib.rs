@@ -150,12 +150,18 @@ mod TrabajoFinal {
 
         fn existe_eleccion(&self, eleccion_id:u32) -> bool
         {
-            self.elecciones.iter().any(|eleccion| eleccion.id == eleccion_id)
+		if eleccion_id >= 1 && eleccion_id <= self.elecciones.len() {
+			return true;
+		}
+		return false;
         }
 
         fn obtener_eleccion_por_id(&mut self, eleccion_id:u32) -> Option<&mut Eleccion>
         {
-            self.elecciones.iter_mut().find(|eleccion| eleccion.id == eleccion_id)
+                if self.existe_eleccion(eleccion_id) {
+                        return Some(&mut self.elecciones[eleccion_id - 1]);
+                }
+                return None;
         }
 
         fn es_administrador(&self) -> bool
@@ -334,10 +340,6 @@ mod TrabajoFinal {
             return Ok(String::from("Registro exitoso. Se te añadió en la cola de usuarios pendientes."));
         }
 
-        fn buscar_eleccion_por_id(&mut self, eleccion_id: u32) -> Option<&mut Eleccion> {
-            self.elecciones.iter_mut().find(|eleccion| eleccion.id == eleccion_id)
-        }
-    
          /// Utilizado por un Administrador.
         /// Se procesará el próximo usuario pendiente en una eleccion particular.
         /// y se lo coloca en el vector de candidato o votante en esa eleccion segun que quiera ser.
@@ -345,7 +347,7 @@ mod TrabajoFinal {
             {
                 if !self.es_administrador() { return Err(ERRORES::NO_ES_ADMINISTRADOR.to_string()); }
 
-               let eleccion_elegida = match self.buscar_eleccion_por_id(eleccion_id) {
+               let eleccion_elegida = match self.obtener_eleccion_por_id(eleccion_id) {
                 Some(eleccion) => eleccion,
                 None => return Err(String::from("Eleccion no encontrada")),
             };
