@@ -1,5 +1,4 @@
 #![cfg_attr(not(feature = "std"), no_std, no_main)]
-
 #[ink::contract]
 mod TrabajoFinal {
     use ink::prelude::string::String;
@@ -137,6 +136,7 @@ mod TrabajoFinal {
 
                    },
                    TIPO_DE_USUARIO::CANDIDATO=>{
+
                     let candidato_id = match (self.candidatos.len() as u32).checked_add(1) {
                         Some(id_validado) => id_validado,
                         None => return Err(String::from("Ocurrio un overflow al calcular la ID del candidato.")),
