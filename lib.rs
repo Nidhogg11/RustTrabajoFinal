@@ -4,6 +4,7 @@
 mod TrabajoFinal {
     use ink::prelude::string::String;
     use ink::prelude::vec::Vec;
+    use scale_info::prelude::format;
     use ink::prelude::string::ToString;
 
     enum ERRORES
@@ -63,7 +64,7 @@ mod TrabajoFinal {
     #[cfg_attr(feature = "std", derive(scale_info::TypeInfo, ink::storage::traits::StorageLayout))]
     struct Eleccion
     {
-        id:u32,
+        id:u64,
         candidatos:Vec<CandidatoConteo>,
         votantes:Vec<Votante>,
         usuarios_rechazados:Vec<AccountId>,
@@ -73,7 +74,6 @@ mod TrabajoFinal {
         fecha_final:u64,
     }
 
-    #[warn(clippy::arithmetic_side_effects)]
     impl Eleccion
     {
         fn contiene_usuario_pendiente(&self, id: AccountId) -> bool {
@@ -88,7 +88,10 @@ mod TrabajoFinal {
         fn obtener_informacion_candidato(&self, candidato_id:u32) -> Option<&CandidatoConteo> //Quizás se debería de cambiar a un campo específico del candidato como por ejemplo discurso/ideas, y también su nombre
         {
             if !self.existe_candidato(candidato_id) { return None; }
-            return Some(&self.candidatos[(candidato_id - 1) as usize]);
+            match (candidato_id as usize).checked_sub(1) {
+                None => None,
+                Some(index) => Some(&self.candidatos[index])
+            }
         }
 
         pub fn votar_candidato(&mut self, votante_id:AccountId, candidato_id:u32) -> Result<String, String>
@@ -102,14 +105,21 @@ mod TrabajoFinal {
             if votante.voto_emitido { return Err(String::from("No se realizó el voto porque ya votaste anteriormente.")); }
             votante.voto_emitido = true;
 
-            let candidato = &mut self.candidatos[(candidato_id - 1) as usize];
-            candidato.votos_totales += 1;
-
-            return Ok(String::from("Voto emitido exitosamente."));
+            let candidato = match (candidato_id as usize).checked_sub(1) {
+                None => return Err(String::from("Se produjo un overflow intentando obtener el candidato.")),
+                Some(index) => &mut self.candidatos[index]
+            };
+            match candidato.votos_totales.checked_add(1) {
+                None => {
+                    votante.voto_emitido = false;
+                    return Err(String::from("Se produjo un overflow al intentar sumar el voto."));
+                },
+                Some(_) => return Ok(String::from("Voto emitido exitosamente."))
+            }
         }
 
         ///Usado por el administrador.
-        ///Revisa el prier usuario pendiente.
+        ///Revisa el primer usuario pendiente.
         ///Lo envia al Vec candidato si es candidato, o votante en caso contrario.
         pub fn procesar_siguiente_usuario_pendiente(&mut self, aceptar_usuario:bool) -> Result<String, String>
         {
@@ -127,14 +137,17 @@ mod TrabajoFinal {
 
                    },
                    TIPO_DE_USUARIO::CANDIDATO=>{
-                    let candidato_id:u32 = 1 + self.candidatos.len() as u32;
+                    let candidato_id = match (self.candidatos.len() as u32).checked_add(1) {
+                        Some(id_validado) => id_validado,
+                        None => return Err(String::from("Ocurrio un overflow al calcular la ID del candidato.")),
+                    };
                     self.candidatos.push(CandidatoConteo{
                         id:usuario,
-                        candidato_id:candidato_id,
+                        candidato_id,
                         votos_totales:0,
                     });
                    },
-                   }
+                }
                 return Ok(String::from("Usuario agregado exitosamente."));
             }
             else{
@@ -184,23 +197,26 @@ mod TrabajoFinal {
             self.usuarios_pendientes.iter().any(|usuario| usuario.id == id)
         }
 
-        fn existe_eleccion(&self, eleccion_id:u32) -> bool
+        fn existe_eleccion(&self, eleccion_id:u64) -> bool
         {
-            if eleccion_id >= 1 && eleccion_id <= self.elecciones.len() as u32 {
+            if eleccion_id >= 1 && eleccion_id <= self.elecciones.len() as u64 {
                 return true;
             }
             return false;
         }
 
-        fn obtener_eleccion_por_id(&mut self, eleccion_id:u32) -> Option<&mut Eleccion>
+        fn obtener_eleccion_por_id(&mut self, eleccion_id:u64) -> Option<&mut Eleccion>
         {
             if self.existe_eleccion(eleccion_id) {
-                return Some(&mut self.elecciones[(eleccion_id - 1) as usize]);
+                match eleccion_id.checked_sub(1) {
+                    Some(index_valid) => return Some(&mut self.elecciones[index_valid as usize]),
+                    None => return None
+                }
             }
             return None;
         }
 
-        fn obtener_ref_eleccion_por_id(&self, eleccion_id:u32) -> Option<&Eleccion>
+        fn obtener_ref_eleccion_por_id(&self, eleccion_id:u64) -> Option<&Eleccion>
         {
             if self.existe_eleccion(eleccion_id) {
                 return Some(&self.elecciones[(eleccion_id - 1) as usize]);
@@ -214,7 +230,7 @@ mod TrabajoFinal {
         }
 
 
-        fn validar_estado_eleccion(&mut self,eleccion_id:u32,block_timestamp:u64,id_usuario:AccountId) -> Result<&mut Eleccion,String>{
+        fn validar_estado_eleccion(&mut self,eleccion_id:u64,block_timestamp:u64,id_usuario:AccountId) -> Result<&mut Eleccion,String>{
             let option_eleccion = self.obtener_eleccion_por_id(eleccion_id);
             if option_eleccion.is_none() { return Err(String::from("No existe una elección con ese id.")); }
             
@@ -246,7 +262,10 @@ mod TrabajoFinal {
                 return Err(String::from("Error en el formato de la fecha final. Formato: dd-mm-YYYY hh:mm"));
             }
 
-            let eleccion_id = (self.elecciones.len() + 1) as u32;
+            let eleccion_id = match (self.elecciones.len() as u64).checked_add(1) {
+                Some(index) => index,
+                None => return Err(String::from("Se produjo un overflow al intentar crear una elección."))
+            };
             let eleccion = Eleccion {
                 id: eleccion_id,
                 candidatos: Vec::new(),
@@ -259,7 +278,7 @@ mod TrabajoFinal {
             };
             self.elecciones.push(eleccion);
 
-            return Ok(String::from("Eleccion creada exitosamente. Id de la elección: ") + &eleccion_id.to_string());
+            return Ok(format!("Eleccion creada exitosamente. Id de la elección: {}", eleccion_id));
         }
 
         /// Utilizado por los usuarios registrados en el sistema para poder ingresar a una elección.
@@ -269,7 +288,7 @@ mod TrabajoFinal {
        
         
         #[ink(message)]
-        pub fn ingresar_a_eleccion(&mut self, eleccion_id:u32, tipo:TIPO_DE_USUARIO) -> Result<String, String>
+        pub fn ingresar_a_eleccion(&mut self, eleccion_id:u64, tipo:TIPO_DE_USUARIO) -> Result<String, String>
         {
             if !self.es_usuario_registrado() { return Err(ERRORES::USUARIO_NO_REGISTRADO.to_string()); }
             let id = self.env().caller();
@@ -298,7 +317,7 @@ mod TrabajoFinal {
         /// Utilizado por el administrador.
         /// El administrador puede iniciar una votación si esta no se inició cuando se alcanzó la fecha inicial de la misma.
         /// El administrador no puede iniciar si la fecha actual es menor a la fecha inicial establecida para la votación. 
-        pub fn iniciar_votacion(&mut self, eleccion_id:u32) -> Result<String, String>
+        pub fn iniciar_votacion(&mut self, eleccion_id:u64) -> Result<String, String>
         {
             if !self.es_administrador() { return Err(ERRORES::NO_ES_ADMINISTRADOR.to_string()); }
             let block_timestamp = self.env().block_timestamp();
@@ -335,7 +354,7 @@ mod TrabajoFinal {
         /// Si el usuario no es votante, no puede votar.
         /// Si el periodo de la votación no comenzó o terminó, no puede votar.
         #[ink(message)]
-        pub fn votar_a_candidato(&mut self, eleccion_id:u32, candidato_id:u32) -> Result<String, String>
+        pub fn votar_a_candidato(&mut self, eleccion_id:u64, candidato_id:u32) -> Result<String, String>
         {
             if !self.es_usuario_registrado() { return Err(ERRORES::USUARIO_NO_REGISTRADO.to_string()); }
             let id = self.env().caller();
@@ -362,7 +381,7 @@ mod TrabajoFinal {
         /// Utilizado por los usuarios registrados en el sistema y que están en la elección ingresada.
         /// Se utiliza para poder obtener información de algún candidato en específico.
         /// Las IDs de los candidatos van de 1 a N.
-        pub fn obtener_informacion_candidato(&self, eleccion_id:u32, candidato_id:u32) -> Result<String, String>
+        pub fn obtener_informacion_candidato(&self, eleccion_id:u64, candidato_id:u32) -> Result<String, String>
         {
             let eleccion_elegida = match self.obtener_ref_eleccion_por_id(eleccion_id) {
                 Some(eleccion) => eleccion,
@@ -461,7 +480,7 @@ mod TrabajoFinal {
          /// Utilizado por un Administrador.
         /// Se procesará el próximo usuario pendiente en una eleccion particular.
         /// y se lo coloca en el vector de candidato o votante en esa eleccion segun que quiera ser.
-        pub fn procesar_usuarios_en_una_eleccion(&mut self, eleccion_id:u32,aceptar_usuario:bool) -> Result<String, String>
+        pub fn procesar_usuarios_en_una_eleccion(&mut self, eleccion_id:u64,aceptar_usuario:bool) -> Result<String, String>
             {
                 if !self.es_administrador() { return Err(ERRORES::NO_ES_ADMINISTRADOR.to_string()); }
 
