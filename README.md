@@ -8,7 +8,8 @@
 - [x] Obtener información de siguiente usuario a registrar en elección (Administrador)
 - [x] Confirmar registro en elección (Administrador)
 - [ ] Iniciar votación en elección (Administrador) [Dato: Esto no está especificado en el trabajo final, pero el profesor me lo recomendó que si la votación no comenzó y es fecha el administrador puede comenzarla, pero la votación se debería de iniciar automáticamente cuando se reciba un voto y sea el tiempo adecuado (esté entre en rango de tiempo)]
-- [ ] Votar candidato en elección (Votante)
+- [x] Votar candidato en elección (Votante)
+- [x] Obtener información de candidato en elección (Todos)
 - [ ] Transferir administrador (Administrador)
 - [ ] Obtener conteo de votos (Todos) [Dato: El conteo se realiza si una persona cualquiera es la primera en querer ver los resultados, después se deberían de almacenar en la blockchain y listo. Aparte de eso, el conteo no debería de realizarse si la votación no finalizó (checkear tiempos)]
 - [ ] Tests
