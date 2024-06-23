@@ -1,9 +1,14 @@
 #![cfg_attr(not(feature = "std"), no_std, no_main)]
+#[allow(non_camel_case_types)]
+#[allow(non_snake_case)]
+#[warn(clippy::arithmetic_side_effects)]
 
 #[ink::contract]
-mod TrabajoFinal {
+pub mod TrabajoFinal {
+    use scale_info::prelude::format;
     use ink::prelude::string::String;
     use ink::prelude::vec::Vec;
+    use ink::prelude::string::ToString;
 
     enum ERRORES
     {
@@ -110,16 +115,16 @@ mod TrabajoFinal {
                     let candidato_id:u32 = 1 + self.candidatos.len() as u32;
                     self.candidatos.push(CandidatoConteo{
                         id:usuario,
-                        candidato_id:candidato_id,
+                        candidato_id,
                         votos_totales:0,
                     });
                    },
                    }
-                return Ok(String::from("Usuario agregado exitosamente."));
+                Ok(String::from("Usuario agregado exitosamente."))
             }
             else{
                 self.usuarios_rechazados.push(usuario);
-                return Ok(String::from("Usuario rechazado exitosamente."));
+                Ok(String::from("Usuario rechazado exitosamente."))
             }
         }
     }
@@ -135,6 +140,7 @@ mod TrabajoFinal {
     }
 
     impl TrabajoFinal {
+
         #[ink(constructor)]
         pub fn new() -> Self {
             Self { 
@@ -148,15 +154,12 @@ mod TrabajoFinal {
         }
 
         fn es_usuario_registrado(&self, id: AccountId) -> bool {
-            let id = self.env().caller();
             self.usuarios.iter().any(|usuario| usuario.id == id)
         }
         fn es_usuario_pendiente(&self, id: AccountId) -> bool {
-            let id=self.env().caller();
             self.usuarios_pendientes.iter().any(|usuario| usuario.id == id)
         }
         fn es_usuario_rechazado(&self, id: AccountId) -> bool {
-            let id=self.env().caller();
             self.usuarios_rechazados.iter().any(|usuario| usuario.id == id)
         }
 
@@ -164,19 +167,19 @@ mod TrabajoFinal {
             if self.es_usuario_registrado(id_usuario) { 
                     return self.usuarios.iter().find(|user| user.id == id_usuario);
             }
-            return None;
+            None
         }
         fn obtener_usuario_pendiente_por_id(&mut self, id_usuario: AccountId) -> Option<&Usuario> {
             if self.es_usuario_pendiente(id_usuario) { 
                 return self.usuarios_pendientes.iter().find(|user| user.id == id_usuario);
             }
-            return None;
+            None
         }
         fn obtener_usuario_rechazado_por_id(&mut self, id_usuario: AccountId) -> Option<&Usuario> {
             if self.es_usuario_rechazado(id_usuario) { 
                 return self.usuarios_rechazados.iter().find(|user| user.id == id_usuario);
             }
-            return None;
+            None
         }
 
         fn existe_eleccion(&self, eleccion_id:u32) -> bool
@@ -184,7 +187,7 @@ mod TrabajoFinal {
             if eleccion_id >= 1 && eleccion_id <= self.elecciones.len() as u32 {
                 return true;
             }
-            return false;
+            false
         }
 
         fn obtener_eleccion_por_id(&mut self, eleccion_id:u32) -> Option<&mut Eleccion>
@@ -192,7 +195,7 @@ mod TrabajoFinal {
             if self.existe_eleccion(eleccion_id) {
                     return Some(&mut self.elecciones[(eleccion_id - 1) as usize]);
             }
-            return None;
+            None
         }
 
         fn es_administrador(&self) -> bool
@@ -208,7 +211,8 @@ mod TrabajoFinal {
             let eleccion = option_eleccion.unwrap();
             if eleccion.contiene_usuario(id_usuario) { return Err(String::from("Ya está registrado en la elección.")); }
             
-            if eleccion.estado == ESTADO_ELECCION::ABIERTA || eleccion.fecha_inicio < block_timestamp {
+            // eleccion.estado == ESTADO_ELECCION::ABIERTA || 
+            if eleccion.fecha_inicio < block_timestamp {
                 return Err(String::from("La votación en la elección ya comenzó, no te puedes registrar."));
             }
             if eleccion.fecha_final < block_timestamp {
@@ -263,14 +267,16 @@ mod TrabajoFinal {
             let eleccion_option = self.obtener_eleccion_por_id(eleccion_id);
             match eleccion_option {
                 Some(eleccion) => {
-                    if eleccion.estado == ESTADO_ELECCION::CERRADA {
-                        return Err(String::from("La eleccion ya se encuantra en el estado correspondiente!"))
+                    match eleccion.estado {
+                        ESTADO_ELECCION::CERRADA => Err(String::from("La eleccion ya se encuantra en el estado correspondiente!")),
+                        _ => {  
+                            eleccion.estado = ESTADO_ELECCION::CERRADA;
+                            Ok(String::from("Eleccion CERRADA exitosamente. Id de la elección: ") + &eleccion.id.to_string())
+                        }
                     }
-                    eleccion.estado = ESTADO_ELECCION::CERRADA;
-                    return Ok(String::from("Eleccion cerrada exitosamente. Id de la elección: ") + &eleccion.id.to_string());
                 },
-                None => return Err(String::from("La eleccion enviada no existe!")),
-            };
+                None => Err(String::from("La eleccion enviada no existe!")),
+            }
         }
         /// Utilizado por un administrador.
         /// cierra una elección colocando su estado en CERRADO (estado anterior al INICIADA).
@@ -281,14 +287,16 @@ mod TrabajoFinal {
             let eleccion_option = self.obtener_eleccion_por_id(eleccion_id);
             match eleccion_option {
                 Some(eleccion) => {
-                    if eleccion.estado == ESTADO_ELECCION::CERRADA {
-                        return Err(String::from("La eleccion ya se encuantra en el estado correspondiente!"))
+                    match eleccion.estado {
+                        ESTADO_ELECCION::ABIERTA => Err(String::from("La eleccion ya se encuantra en el estado correspondiente!")),
+                        _ => {  
+                            eleccion.estado = ESTADO_ELECCION::ABIERTA;
+                            Ok(String::from("Eleccion ABIERTA exitosamente. Id de la elección: ") + &eleccion.id.to_string())
+                        }
                     }
-                    eleccion.estado = ESTADO_ELECCION::CERRADA;
-                    return Ok(String::from("Eleccion cerrada exitosamente. Id de la elección: ") + &eleccion.id.to_string());
                 },
-                None => return Err(String::from("La eleccion enviada no existe!")),
-            };
+                None => Err(String::from("La eleccion enviada no existe!")),
+            }
         }
         /// Utilizado por un administrador.
         /// cierra una elección colocando su estado en CERRADO (estado anterior al INICIADA).
@@ -299,14 +307,16 @@ mod TrabajoFinal {
             let eleccion_option = self.obtener_eleccion_por_id(eleccion_id);
             match eleccion_option {
                 Some(eleccion) => {
-                    if eleccion.estado == ESTADO_ELECCION::CERRADA {
-                        return Err(String::from("La eleccion ya se encuantra en el estado correspondiente!"))
+                    match eleccion.estado {
+                        ESTADO_ELECCION::INICIADA => Err(String::from("La eleccion ya se encuantra en el estado correspondiente!")),
+                        _ => {  
+                            eleccion.estado = ESTADO_ELECCION::INICIADA;
+                            Ok(String::from("Eleccion INICIADA exitosamente. Id de la elección: ") + &eleccion.id.to_string())
+                        }
                     }
-                    eleccion.estado = ESTADO_ELECCION::CERRADA;
-                    return Ok(String::from("Eleccion cerrada exitosamente. Id de la elección: ") + &eleccion.id.to_string());
                 },
-                None => return Err(String::from("La eleccion enviada no existe!")),
-            };
+                None => Err(String::from("La eleccion enviada no existe!")),
+            }
         }
         /// Utilizado por un administrador.
         /// cierra una elección colocando su estado en CERRADO (estado anterior al INICIADA).
@@ -317,14 +327,16 @@ mod TrabajoFinal {
             let eleccion_option = self.obtener_eleccion_por_id(eleccion_id);
             match eleccion_option {
                 Some(eleccion) => {
-                    if eleccion.estado == ESTADO_ELECCION::CERRADA {
-                        return Err(String::from("La eleccion ya se encuantra en el estado correspondiente!"))
+                    match eleccion.estado {
+                        ESTADO_ELECCION::FINALIZADA => Err(String::from("La eleccion ya se encuantra en el estado correspondiente!")),
+                        _ => {  
+                            eleccion.estado = ESTADO_ELECCION::FINALIZADA;
+                            Ok(String::from("Eleccion FINALIZADA exitosamente. Id de la elección: ") + &eleccion.id.to_string())
+                        }
                     }
-                    eleccion.estado = ESTADO_ELECCION::CERRADA;
-                    return Ok(String::from("Eleccion cerrada exitosamente. Id de la elección: ") + &eleccion.id.to_string());
                 },
-                None => return Err(String::from("La eleccion enviada no existe!")),
-            };
+                None => Err(String::from("La eleccion enviada no existe!")),
+            }
         }
 
         #[ink(message)]
@@ -364,7 +376,7 @@ mod TrabajoFinal {
 
             eleccion.usuarios_pendientes.push((id,tipo));
 
-            return Ok(format!("Ingresó a la elección correctamente Pendiente de aprobacion del Administrador"));
+            return Ok("Ingresó a la elección correctamente Pendiente de aprobacion del Administrador".to_string());
               
         }
 
@@ -422,7 +434,7 @@ mod TrabajoFinal {
                     let mut str = String::from("Nombre: ") + usuario.nombre.as_str();
                     str.push_str((String::from("\nApellido: ") + usuario.apellido.as_str()).as_str());
                     str.push_str((String::from("\nDNI: ") + usuario.apellido.as_str()).as_str());
-                    return Ok(str);
+                    Ok(str)
                 },
                 None => Err(String::from("No hay usuarios pendientes.")),
             }
@@ -477,7 +489,7 @@ mod TrabajoFinal {
                     let mut str = String::from("Nombre: ") + usuario.nombre.as_str();
                     str.push_str((String::from("\nApellido: ") + usuario.apellido.as_str()).as_str());
                     str.push_str((String::from("\nDNI: ") + usuario.apellido.as_str()).as_str());
-                    return Ok(str);
+                    Ok(str)
                 },
                 None => Err(String::from("No hay usuarios con tal id.")),
             }
@@ -485,13 +497,13 @@ mod TrabajoFinal {
         #[ink(message)]
         pub fn obtener_datos_usuario_pendiente_por_id(&mut self, id_usuario: AccountId) -> Result<String, String> 
         {
-            let sig_usuario = self.obtener_usuario_por_id(id_usuario);
+            let sig_usuario = self.obtener_usuario_pendiente_por_id(id_usuario);
             match sig_usuario {
                 Some(usuario) => {
                     let mut str = String::from("Nombre: ") + usuario.nombre.as_str();
                     str.push_str((String::from("\nApellido: ") + usuario.apellido.as_str()).as_str());
                     str.push_str((String::from("\nDNI: ") + usuario.apellido.as_str()).as_str());
-                    return Ok(str);
+                    Ok(str)
                 },
                 None => Err(String::from("No hay usuarios con tal id.")),
             }
@@ -499,13 +511,13 @@ mod TrabajoFinal {
         #[ink(message)]
         pub fn obtener_datos_usuario_rechazado_por_id(&mut self, id_usuario: AccountId) -> Result<String, String> 
         {
-            let sig_usuario = self.obtener_usuario_por_id(id_usuario);
+            let sig_usuario = self.obtener_usuario_rechazado_por_id(id_usuario);
             match sig_usuario {
                 Some(usuario) => {
                     let mut str = String::from("Nombre: ") + usuario.nombre.as_str();
                     str.push_str((String::from("\nApellido: ") + usuario.apellido.as_str()).as_str());
                     str.push_str((String::from("\nDNI: ") + usuario.apellido.as_str()).as_str());
-                    return Ok(str);
+                    Ok(str)
                 },
                 None => Err(String::from("No hay usuarios con tal id.")),
             }
@@ -553,7 +565,7 @@ mod TrabajoFinal {
                 Some(eleccion) => eleccion,
                 None => return Err(String::from("Eleccion no encontrada")),
             };
-            return eleccion_elegida.procesar_siguiente_usuario_pendiente(aceptar_usuario);
+            eleccion_elegida.procesar_siguiente_usuario_pendiente(aceptar_usuario)
 
             
         }
