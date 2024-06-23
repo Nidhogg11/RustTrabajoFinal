@@ -300,14 +300,34 @@ mod TrabajoFinal {
         /// El administrador no puede iniciar si la fecha actual es menor a la fecha inicial establecida para la votación. 
         pub fn iniciar_votacion(&mut self, eleccion_id:u32) -> Result<String, String>
         {
-            todo!()
+            if !self.es_administrador() { return Err(ERRORES::NO_ES_ADMINISTRADOR.to_string()); }
+            let block_timestamp = self.env().block_timestamp();
+
+            match self.obtener_eleccion_por_id(eleccion_id) {
+                Some(eleccion) => {
+                    if block_timestamp > eleccion.fecha_final {
+                        return Err(String::from("La votación ya finalizó."));
+                    }
+                    if eleccion.votacion_iniciada {
+                        return Err(String::from("La votación ya inició."));
+                    }
+                    if block_timestamp < eleccion.fecha_inicio {
+                        return Err(String::from("Todavía no es la fecha para la votación."));
+                    }
+                    eleccion.votacion_iniciada = true;
+                    return Ok(String::from("Se inició la votación exitosamente."));
+                },
+                None => return Err(String::from("No existe una elección con ese id."))
+            }
         }
 
         /// Utilizado por el administrador.
         /// Permite al administrador transferir el rol de administrador a otra persona.
         pub fn transferir_administrador(&mut self, id:AccountId) -> Result<String, String>
         {
-            todo!()
+            if !self.es_administrador() { return Err(ERRORES::NO_ES_ADMINISTRADOR.to_string()); }
+            self.administrador = id;
+            return Ok(String::from("Se transfirió el rol de administrador correctamente."));
         }
 
         /// Utilizado por los usuarios registrados en el sistema y que están en la elección como votantes.
