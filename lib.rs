@@ -153,6 +153,10 @@ pub mod TrabajoFinal {
             }
         }
 
+        fn es_administrador(&self) -> bool {
+            self.env().caller() == self.administrador
+        }
+
         fn es_usuario_registrado(&self, id: AccountId) -> bool {
             self.usuarios.iter().any(|usuario| usuario.id == id)
         }
@@ -197,12 +201,6 @@ pub mod TrabajoFinal {
             }
             None
         }
-
-        fn es_administrador(&self) -> bool
-        {
-            self.env().caller() == self.administrador
-        }
-
 
         fn validar_estado_eleccion(&mut self,eleccion_id:u32,block_timestamp:u64,id_usuario:AccountId) -> Result<&mut Eleccion,String>{
             let option_eleccion = self.obtener_eleccion_por_id(eleccion_id);
@@ -343,6 +341,29 @@ pub mod TrabajoFinal {
         pub fn obtener_ids_elecciones(&self) -> Vec<u32>
         {
             self.elecciones.iter().map(|eleccion| eleccion.id).collect()
+        }
+
+        #[ink(message)]
+        pub fn obtener_datos_eleccion_por_id(&mut self, eleccion_id: u32) -> Result<String, String>
+        {
+            if !self.es_administrador() { return Err(ERRORES::NO_ES_ADMINISTRADOR.to_string()); }
+            let eleccion_option = self.obtener_eleccion_por_id(eleccion_id);
+            match eleccion_option {
+                Some(eleccion) => {
+                    let mut str = String::from("ID: ") + &eleccion.id.to_string();
+                    match eleccion.estado {
+                        ESTADO_ELECCION::CERRADA => str.push_str("\nEstado: CERRADA"),
+                        ESTADO_ELECCION::ABIERTA => str.push_str("\nEstado: ABIERTA"),
+                        ESTADO_ELECCION::INICIADA => str.push_str("\nEstado: INICIADA"),
+                        ESTADO_ELECCION::FINALIZADA => str.push_str("\nEstado: FINALIZADA"),
+                    }
+                    str.push_str((String::from("\nfecha_inicio: ") + &eleccion.fecha_inicio.to_string()).as_str());
+                    str.push_str((String::from("\nfecha_final: ") + &eleccion.fecha_final.to_string()).as_str());
+                    Ok(str)
+                    // Ok(String::from("Id de la elección: ") + &eleccion.id.to_string())
+                },
+                None => Err(String::from("La eleccion enviada no existe!")),
+            }
         }
 
     // ====================================================================
@@ -566,8 +587,6 @@ pub mod TrabajoFinal {
                 None => return Err(String::from("Eleccion no encontrada")),
             };
             eleccion_elegida.procesar_siguiente_usuario_pendiente(aceptar_usuario)
-
-            
         }
     }
    
