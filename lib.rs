@@ -103,7 +103,7 @@ pub mod TrabajoFinal {
         }
         fn esta_cerrada(&self) -> bool {
             match self.estado {
-                ESTADO_ELECCION::FINALIZADA => true,
+                ESTADO_ELECCION::CERRADA => true,
                 _ => false
             }
         }
@@ -151,18 +151,21 @@ pub mod TrabajoFinal {
                 None => return Err(String::from("No estás registrado en la elección."))
             };
             if votante.voto_emitido { return Err(String::from("No se realizó el voto porque ya votaste anteriormente.")); }
-            votante.voto_emitido = true;
-
+            
             let candidato = match (candidato_id as usize).checked_sub(1) {
                 None => return Err(String::from("Se produjo un overflow intentando obtener el candidato.")),
                 Some(index) => &mut self.candidatos[index]
             };
+
             match candidato.votos_totales.checked_add(1) {
                 None => {
-                    votante.voto_emitido = false;
                     return Err(String::from("Se produjo un overflow al intentar sumar el voto."));
                 },
-                Some(_) => return Ok(String::from("Voto emitido exitosamente."))
+                Some(nuevo_votos_totales) => { 
+                    votante.voto_emitido = true;
+                    candidato.votos_totales = nuevo_votos_totales;
+                    return Ok(String::from("Voto emitido exitosamente."));
+                }
             }
         }
 
@@ -185,7 +188,12 @@ pub mod TrabajoFinal {
 
                    },
                    TIPO_DE_USUARIO::CANDIDATO=>{
-                    let candidato_id:u64 = 1 + self.candidatos.len() as u64;
+                    let candidato_id_check = (self.candidatos.len() as u64).checked_add(1);
+                    let candidato_id:u64;
+                    match candidato_id_check {
+                        Some(id_validado) => candidato_id = id_validado,
+                        None => return Err(String::from("Ocurrio un overflow al calcular la ID del candidato.")),
+                    }
                     self.candidatos.push(CandidatoConteo{
                         id: candidato_id,
                         usuario_id: usuario,
@@ -267,12 +275,19 @@ pub mod TrabajoFinal {
             false
         }
 
-        fn obtener_eleccion_por_id(&mut self, eleccion_id:u64) -> Option<&mut Eleccion>
-        {
+        fn obtener_eleccion_por_id(&mut self, eleccion_id:u64) -> Option<&mut Eleccion> {
             if self.existe_eleccion(eleccion_id) {
-                    return Some(&mut self.elecciones[(eleccion_id - 1) as usize]);
+                let index = eleccion_id.checked_sub(1);
+                match index {
+                    Some(index_valid) => {
+                        return Some(&mut self.elecciones[index_valid as usize])
+                        }
+                    None => {
+                        return None
+                    }
+                }
             }
-            None
+            return None;
         }
 
         fn validar_estado_eleccion_para_inscripciones(&mut self,eleccion_id:u64, block_timestamp:u64) -> Result<&mut Eleccion,String>{
@@ -497,7 +512,12 @@ pub mod TrabajoFinal {
                 return Err(String::from("Error en el formato de la fecha final. Formato: dd-mm-YYYY hh:mm"));
             }
 
-            let eleccion_id = (self.elecciones.len() + 1) as u64;
+            let eleccion_id_check = (self.elecciones.len() as u64).checked_add(1);
+            let eleccion_id:u64;
+            match eleccion_id_check {
+                Some(id_validado) => eleccion_id = id_validado,
+                None => return Err(String::from("Ocurrio un overflow al calcular la ID de la eleccion.")),
+            }
             let eleccion = Eleccion {
                 id: eleccion_id,
                 candidatos: Vec::new(),
@@ -515,15 +535,22 @@ pub mod TrabajoFinal {
 
         /// Utilizado por un administrador.
         /// cierra una elección colocando su estado en CERRADO (estado anterior al INICIADA).
-        #[ink(message)]
+        #[ink(message)] //FUNCIONA //MERJORAR
         pub fn cerrar_eleccion(&mut self, eleccion_id: u64) -> Result<String, String>
         {
             if !self.es_administrador() { return Err(ERRORES::NO_ES_ADMINISTRADOR.to_string()); }
+
+            let block_timestamp = self.env().block_timestamp();
             let eleccion_option = self.obtener_eleccion_por_id(eleccion_id);
             match eleccion_option {
                 Some(eleccion) => {
+                    if eleccion.fecha_inicio < block_timestamp {
+                        return Err(String::from("La eleccion se encuentra en la fecha de votacion!"));
+                    }
                     match eleccion.estado {
                         ESTADO_ELECCION::CERRADA => Err(String::from("La eleccion ya se encuantra en el estado correspondiente!")),
+                        ESTADO_ELECCION::INICIADA => Err(String::from("La eleccion se encuentra en el estado de votacion!")),
+                        ESTADO_ELECCION::FINALIZADA => Err(String::from("La eleccion ya cerro!")),
                         _ => {  
                             eleccion.estado = ESTADO_ELECCION::CERRADA;
                             Ok(String::from("Eleccion CERRADA exitosamente. Id de la elección: ") + &eleccion.id.to_string())
@@ -535,15 +562,22 @@ pub mod TrabajoFinal {
         }
         /// Utilizado por un administrador.
         /// cierra una elección colocando su estado en CERRADO (estado anterior al INICIADA).
-        #[ink(message)]
+        #[ink(message)] //FUNCIONA //MERJORAR
         pub fn abrir_eleccion(&mut self, eleccion_id: u64) -> Result<String, String>
         {
             if !self.es_administrador() { return Err(ERRORES::NO_ES_ADMINISTRADOR.to_string()); }
+
+            let block_timestamp = self.env().block_timestamp();
             let eleccion_option = self.obtener_eleccion_por_id(eleccion_id);
             match eleccion_option {
                 Some(eleccion) => {
+                    if eleccion.fecha_inicio < block_timestamp {
+                        return Err(String::from("La eleccion se encuentra en la fecha de votacion!"));
+                    }
                     match eleccion.estado {
-                        ESTADO_ELECCION::ABIERTA => Err(String::from("La eleccion ya se encuantra en el estado correspondiente!")),
+                        ESTADO_ELECCION::ABIERTA => Err(String::from("La eleccion ya se encuentra en el estado correspondiente!")),
+                        ESTADO_ELECCION::INICIADA => Err(String::from("La eleccion se encuentra en el estado de votacion!")),
+                        ESTADO_ELECCION::FINALIZADA => Err(String::from("La eleccion ya cerro!")),
                         _ => {  
                             eleccion.estado = ESTADO_ELECCION::ABIERTA;
                             Ok(String::from("Eleccion ABIERTA exitosamente. Id de la elección: ") + &eleccion.id.to_string())
@@ -567,8 +601,12 @@ pub mod TrabajoFinal {
                     if eleccion.fecha_inicio > block_timestamp {
                         return Err(String::from("No es la fecha propuesta, no puedes iniciarla."));
                     }
+                    if eleccion.fecha_final < block_timestamp {
+                        return Err(String::from("Ya finalizo, no puedes iniciarla."));
+                    }
                     match eleccion.estado {
                         ESTADO_ELECCION::INICIADA => Err(String::from("La eleccion ya se encuentra en el estado correspondiente!")),
+                        ESTADO_ELECCION::FINALIZADA => Err(String::from("La eleccion ya cerro!")),
                         _ => {  
                             eleccion.estado = ESTADO_ELECCION::INICIADA;
                             Ok(String::from("Eleccion INICIADA exitosamente. Id de la elección: ") + &eleccion.id.to_string())
@@ -604,16 +642,16 @@ pub mod TrabajoFinal {
             }
         }
 
-        #[ink(message)]
+        #[ink(message)] //FUNCIONA
         pub fn obtener_ids_elecciones(&self) -> Vec<u64>
         {
             self.elecciones.iter().map(|eleccion| eleccion.id).collect()
         }
 
-        #[ink(message)]
+        #[ink(message)] //FUNCIONA
         pub fn obtener_datos_eleccion_por_id(&mut self, eleccion_id: u64) -> Result<String, String>
         {
-            if !self.es_administrador() { return Err(ERRORES::NO_ES_ADMINISTRADOR.to_string()); }
+            // if !self.es_administrador() { return Err(ERRORES::NO_ES_ADMINISTRADOR.to_string()); }
             let eleccion_option = self.obtener_eleccion_por_id(eleccion_id);
             match eleccion_option {
                 Some(eleccion) => {
@@ -633,10 +671,10 @@ pub mod TrabajoFinal {
             }
         }
         
-        #[ink(message)]
+        #[ink(message)] //FUNCIONA
         pub fn obtener_candidatos_eleccion_por_id(&mut self, eleccion_id: u64) -> Result<String, String>
         {
-            if !self.es_administrador() { return Err(ERRORES::NO_ES_ADMINISTRADOR.to_string()); }
+            // if !self.es_administrador() { return Err(ERRORES::NO_ES_ADMINISTRADOR.to_string()); }
             let eleccion_option = self.obtener_eleccion_por_id(eleccion_id);
             match eleccion_option {
                 Some(eleccion) => {
@@ -654,10 +692,10 @@ pub mod TrabajoFinal {
                 None => Err(String::from("La eleccion enviada no existe!")),
             }
         }
-        #[ink(message)]
+        #[ink(message)] //FUNCIONA
         pub fn obtener_votantes_eleccion_por_id(&mut self, eleccion_id: u64) -> Result<String, String>
         {
-            if !self.es_administrador() { return Err(ERRORES::NO_ES_ADMINISTRADOR.to_string()); }
+            // if !self.es_administrador() { return Err(ERRORES::NO_ES_ADMINISTRADOR.to_string()); }
             let eleccion_option = self.obtener_eleccion_por_id(eleccion_id);
             match eleccion_option {
                 Some(eleccion) => {
@@ -684,7 +722,7 @@ pub mod TrabajoFinal {
     // ====================================================================
         /// Utilizado por un Administrador.
         /// Obtiene la información del próximo usuario a registrarse.
-        #[ink(message)]
+        #[ink(message)] //FUNCIONA
         pub fn obtener_siguiente_usuario_pendiente_en_una_eleccion(&mut self, eleccion_id:u64) -> Result<String, String>
         {
             if !self.es_administrador() { return Err(ERRORES::NO_ES_ADMINISTRADOR.to_string()); }
@@ -709,7 +747,7 @@ pub mod TrabajoFinal {
         /// Utilizado por un Administrador.
         /// Se procesará el próximo usuario pendiente en una eleccion particular.
         /// y se lo coloca en el vector de candidato o votante en esa eleccion segun que quiera ser.
-        #[ink(message)]
+        #[ink(message)] //FUNCIONA
         pub fn procesar_usuarios_en_una_eleccion(&mut self, eleccion_id:u64,aceptar_usuario:bool) -> Result<String, String>
         {
                 if !self.es_administrador() { return Err(ERRORES::NO_ES_ADMINISTRADOR.to_string()); }
@@ -724,7 +762,7 @@ pub mod TrabajoFinal {
 
 
         // inscribir_usuario_en_eleccion (deben ser usuarios del sistema  y no estar ya en la eleccion)
-        #[ink(message)]
+        #[ink(message)] //FUNCIONA
         pub fn inscribir_usuario_en_eleccion(&mut self, eleccion_id:u64, tipo:TIPO_DE_USUARIO) -> Result<String, String>
         {
             // es usuario valido en el sistema (no esta pendiente de aprobacion y no esta rechazado)
@@ -753,7 +791,7 @@ pub mod TrabajoFinal {
         /// Utilizado por los usuarios registrados en el sistema y que están en la elección ingresada.
         /// Se utiliza para poder obtener información de algún candidato en específico.
         /// Las IDs de los candidatos van de 1 a N.
-        #[ink(message)]
+        #[ink(message)] //FUNCIONA
         pub fn obtener_informacion_candidato(&mut self, eleccion_id: u64, candidato_id: u64) -> Result<String, String> {
             let eleccion_elegida = self.obtener_eleccion_por_id(eleccion_id)
                 .ok_or_else(|| String::from("No existe una elección con ese id."))?;
@@ -774,7 +812,7 @@ pub mod TrabajoFinal {
         /// Si el usuario ya emitió su voto, no puede volver a votar en la misma elección.
         /// Si el usuario no es votante, no puede votar.
         /// Si el periodo de la votación no comenzó o terminó, no puede votar.
-        #[ink(message)]
+        #[ink(message)] 
         pub fn votar_a_candidato(&mut self, eleccion_id:u64, candidato_id:u64) -> Result<String, String>
         {
             // es usuario valido en el sistema (no esta pendiente de aprobacion y no esta rechazado)
@@ -806,7 +844,7 @@ pub mod TrabajoFinal {
 
         /// Utilizado por el administrador.
         /// Permite al administrador transferir el rol de administrador a otra persona.
-        #[ink(message)]
+        #[ink(message)] //FUNCIONA
         pub fn transferir_administrador(&mut self, id:AccountId) -> Result<String, String>
         {
             if !self.es_administrador() { return Err(ERRORES::NO_ES_ADMINISTRADOR.to_string()); }
