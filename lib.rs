@@ -483,7 +483,7 @@ pub mod TrabajoFinal {
 
         /// Utilizado por un administrador.
         /// Crea una elección colocando fecha de inicio y final.
-        #[ink(message)]
+        #[ink(message)] //FUNCIONA
         pub fn crear_eleccion(&mut self, fecha_inicial:String, fecha_final:String) -> Result<String, String>
         {
             if !self.es_administrador() { return Err(ERRORES::NO_ES_ADMINISTRADOR.to_string()); }
