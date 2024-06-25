@@ -113,7 +113,10 @@ mod TrabajoFinal {
                     votante.voto_emitido = false;
                     return Err(String::from("Se produjo un overflow al intentar sumar el voto."));
                 },
-                Some(_) => return Ok(String::from("Voto emitido exitosamente."))
+                Some(votos_totales) => {
+                    candidato.votos_totales = votos_totales;
+                    return Ok(String::from("Voto emitido exitosamente."));
+                }
             }
         }
 
