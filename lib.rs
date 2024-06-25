@@ -170,7 +170,6 @@ mod TrabajoFinal {
         elecciones:Vec<Eleccion>,
     }
 
-    #[warn(clippy::arithmetic_side_effects)]
     impl TrabajoFinal {
         #[ink(constructor)]
         pub fn new() -> Self {
@@ -222,7 +221,10 @@ mod TrabajoFinal {
         fn obtener_ref_eleccion_por_id(&self, eleccion_id:u64) -> Option<&Eleccion>
         {
             if self.existe_eleccion(eleccion_id) {
-                return Some(&self.elecciones[(eleccion_id - 1) as usize]);
+                match eleccion_id.checked_sub(1) {
+                    Some(index_valid) => return Some(&self.elecciones[index_valid as usize]),
+                    None => return None
+                }
             }
             return None;
         }
