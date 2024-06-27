@@ -496,10 +496,142 @@ mod TrabajoFinal {
     }
    
         
-}
+    
 
-    /*#[cfg(test)]
+    #[cfg(test)]
     mod tests {
         use super::*;
-    }*/
+        use ink::env::test::default_accounts;
+        use ink::env::DefaultEnvironment;
+
+        #[test]
+        fn test_no_es_administrador() {
+            let error = ERRORES::NO_ES_ADMINISTRADOR;
+            assert_eq!(error.to_string(), "No eres el administrador.");
+        }
+    
+        #[test]
+        fn test_usuario_no_registrado() {
+            let error = ERRORES::USUARIO_NO_REGISTRADO;
+            assert_eq!(error.to_string(), "No estás registrado en el sistema. Espera a que te acepten en el mismo o realiza la solicitud.");
+        }
+
+
+    
+        fn setup_eleccion() -> Eleccion {
+            Eleccion {
+                id: 1,
+                candidatos: Vec::new(),
+                votantes: Vec::new(),
+                usuarios_rechazados: Vec::new(),
+                usuarios_pendientes: Vec::new(),
+                votacion_iniciada: false,
+                fecha_inicio: 0,
+                fecha_final: 0,
+            }
+        }
+    
+        #[test]
+        fn test_contiene_usuario_pendiente() {
+            let mut eleccion = setup_eleccion();
+            let accounts = default_accounts::<DefaultEnvironment>();//uentas predeterminadas utilizadas para tests
+            
+            eleccion.usuarios_pendientes.push((accounts.alice, TIPO_DE_USUARIO::VOTANTE));
+            
+            assert!(eleccion.contiene_usuario_pendiente(accounts.alice));
+            assert!(!eleccion.contiene_usuario_pendiente(accounts.bob));
+        }
+    
+        #[test]
+        fn test_existe_candidato() {
+            let mut eleccion = setup_eleccion();
+            let accounts = default_accounts::<DefaultEnvironment>();
+            
+            eleccion.candidatos.push(CandidatoConteo {
+                id: accounts.alice,
+                candidato_id: 1,
+                votos_totales: 0,
+            });
+    
+            assert!(eleccion.existe_candidato(1));
+            assert!(!eleccion.existe_candidato(2));
+        }
+    
+        #[test]
+        fn test_votar_candidato() {
+            let mut eleccion = setup_eleccion();
+            let accounts = default_accounts::<DefaultEnvironment>();
+    
+            eleccion.candidatos.push(CandidatoConteo {
+                id: accounts.alice,
+                candidato_id: 1,
+                votos_totales: 0,
+            });
+    
+            eleccion.votantes.push(Votante {
+                id: accounts.bob,
+                voto_emitido: false,
+            });
+    
+            let result = eleccion.votar_candidato(accounts.bob, 1);
+            assert_eq!(result, Ok(String::from("Voto emitido exitosamente.")));
+            assert!(eleccion.votantes[0].voto_emitido);
+            assert_eq!(eleccion.candidatos[0].votos_totales, 1);
+        }
+    
+        #[test]
+        fn test_procesar_siguiente_usuario_pendiente() {
+            let mut eleccion = setup_eleccion();
+            let accounts = default_accounts::<DefaultEnvironment>();
+    
+            eleccion.usuarios_pendientes.push((accounts.alice, TIPO_DE_USUARIO::VOTANTE));
+            eleccion.usuarios_pendientes.push((accounts.bob, TIPO_DE_USUARIO::CANDIDATO));
+    
+            let result = eleccion.procesar_siguiente_usuario_pendiente(true);
+            assert_eq!(result, Ok(String::from("Usuario agregado exitosamente.")));
+            assert_eq!(eleccion.votantes.len(), 1);
+            assert_eq!(eleccion.candidatos.len(), 0);
+    
+            let result = eleccion.procesar_siguiente_usuario_pendiente(true);
+            assert_eq!(result, Ok(String::from("Usuario agregado exitosamente.")));
+            assert_eq!(eleccion.votantes.len(), 1);
+            assert_eq!(eleccion.candidatos.len(), 1);
+    
+            let result = eleccion.procesar_siguiente_usuario_pendiente(false);
+            assert_eq!(result, Err(String::from("No hay usuarios pendientes.")));
+        }
+
+        #[test]
+        fn test_obtener_informacion_candidato() {
+            let mut eleccion = setup_eleccion();
+            let accounts = default_accounts::<DefaultEnvironment>();
+            eleccion.candidatos.push(CandidatoConteo {
+                id: accounts.alice,
+                candidato_id: 1,
+                votos_totales: 0,
+            });
+            eleccion.candidatos.push(CandidatoConteo {
+                id: accounts.bob,
+                candidato_id: 2,
+                votos_totales: 0,
+            });
+
+            let candidato_info = eleccion.obtener_informacion_candidato(1);
+            assert!(candidato_info.is_some());
+            assert_eq!(candidato_info.unwrap().id, accounts.alice);
+
+            let candidato_info = eleccion.obtener_informacion_candidato(2);
+            assert!(candidato_info.is_some());
+            assert_eq!(candidato_info.unwrap().id, accounts.bob);
+    
+            let candidato_info = eleccion.obtener_informacion_candidato(3);
+            assert!(candidato_info.is_none());
+        }
+    }
+
+    
+
+}
+
+
 
