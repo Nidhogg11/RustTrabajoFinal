@@ -183,6 +183,7 @@ mod TrabajoFinal {
             }
         }
 
+
         fn obtener_usuario(&self, id:AccountId) -> Option<&Usuario> {
             let id = self.env().caller();
             self.usuarios.iter().find(|usuario| usuario.id == id)
@@ -251,7 +252,12 @@ mod TrabajoFinal {
             Ok(eleccion)
         }
 
-        /// Utilizado por un administrador.
+        fn crear_eleccion_privado(&mut self, fecha_inicial: String, fecha_final: String) -> Result<String, String> {
+            self.crear_eleccion(fecha_inicial, fecha_final)
+        }
+
+
+         /// Utilizado por un administrador.
         /// Crea una elección colocando fecha de inicio y final.
         #[ink(message)]
         pub fn crear_eleccion(&mut self, fecha_inicial:String, fecha_final:String) -> Result<String, String>
@@ -286,12 +292,16 @@ mod TrabajoFinal {
             return Ok(format!("Eleccion creada exitosamente. Id de la elección: {}", eleccion_id));
         }
 
+
+        fn ingresar_a_eleccion_privado(&mut self, eleccion_id:u64, tipo:TIPO_DE_USUARIO) -> Result<String, String>
+        {
+            self.ingresar_a_eleccion(eleccion_id,tipo)
+        }
+
         /// Utilizado por los usuarios registrados en el sistema para poder ingresar a una elección.
         /// Un usuario registrado y que no está registrado en la elección puede ingresar a la misma como candidato o votante.
         /// Estos no pueden ingresar a la misma si esta ya comenzó su periodo de votación o ya terminó la elección.
-        /// Para ingresar como candidato es necesario una candidatura.
-       
-        
+        /// Para ingresar como candidato es necesario una candidatura.   
         #[ink(message)]
         pub fn ingresar_a_eleccion(&mut self, eleccion_id:u64, tipo:TIPO_DE_USUARIO) -> Result<String, String>
         {
@@ -354,6 +364,12 @@ mod TrabajoFinal {
             return Ok(String::from("Se transfirió el rol de administrador correctamente."));
         }
 
+
+        fn votar_a_candidato_privado(&mut self, eleccion_id:u64, candidato_id:u32) -> Result<String, String>
+        {
+            self.votar_a_candidato(eleccion_id, candidato_id)
+        }
+
         /// Utilizado por los usuarios registrados en el sistema y que están en la elección como votantes.
         /// Si el usuario ya emitió su voto, no puede volver a votar en la misma elección.
         /// Si el usuario no es votante, no puede votar.
@@ -406,6 +422,12 @@ mod TrabajoFinal {
             return Ok(informacion);
         }
 
+
+        fn obtener_informacion_siguiente_usuario_pendiente_privado(&self) -> Result<String, String>
+        {
+            self.obtener_informacion_siguiente_usuario_pendiente()
+        }
+
         /// Utilizado por un Administrador.
         /// Obtiene la información del próximo usuario a registrarse.
         #[ink(message)]
@@ -422,6 +444,11 @@ mod TrabajoFinal {
                 },
                 None => Err(String::from("No hay usuarios pendientes.")),
             }
+        }
+
+        fn procesar_siguiente_usuario_pendiente_privado(&mut self, aceptar_usuario:bool) -> Result<String, String>
+        {
+            self.procesar_siguiente_usuario_pendiente(aceptar_usuario)
         }
 
         /// Utilizado por un Administrador.
@@ -446,6 +473,11 @@ mod TrabajoFinal {
             return Ok(String::from("Usuario rechazado exitosamente."));
         }
 
+        fn activar_registro_privado(&mut self) -> Result<String, String>
+        {
+            self.activar_registro()
+        }
+
         /// Utilizado por un administrador.
         /// Activa el registro de usuarios si no está activo el registro.
         #[ink(message)]
@@ -457,6 +489,11 @@ mod TrabajoFinal {
             return Ok(String::from("Se activó el registro para los usuarios."));
         }
 
+
+        fn registrarse_privado(&mut self, nombre:String, apellido:String, dni:String) -> Result<String, String>
+        {
+            self.registrarse(nombre, apellido, dni)
+        }
         /// Utilizado por los usuarios para poder registrarse en el sistema.
         /// Luego de registrarse queda pendiente de aceptación por parte de un Administrador.
         /// Si tu registro es rechazado, no podrás volver a intentar registrarte.
@@ -498,10 +535,228 @@ mod TrabajoFinal {
     }
    
         
+    
 
-
-    /*#[cfg(test)]
+    #[cfg(test)]
     mod tests {
         use super::*;
-    }*/
+        use ink::env::test::default_accounts;
+        use ink::env::DefaultEnvironment;
+        
+
+        #[test]
+        fn test_no_es_administrador() {
+            let error = ERRORES::NO_ES_ADMINISTRADOR;
+            assert_eq!(error.to_string(), "No eres el administrador.");
+        }
+    
+        #[test]
+        fn test_usuario_no_registrado() {
+            let error = ERRORES::USUARIO_NO_REGISTRADO;
+            assert_eq!(error.to_string(), "No estás registrado en el sistema. Espera a que te acepten en el mismo o realiza la solicitud.");
+        }
+
+
+    
+        fn setup_eleccion() -> Eleccion {
+            Eleccion {
+                id: 1,
+                candidatos: Vec::new(),
+                votantes: Vec::new(),
+                usuarios_rechazados: Vec::new(),
+                usuarios_pendientes: Vec::new(),
+                votacion_iniciada: false,
+                fecha_inicio: 0,
+                fecha_final: 0,
+            }
+        }
+    
+        #[test]
+        fn test_contiene_usuario_pendiente() {
+            let mut eleccion = setup_eleccion();
+            let accounts = default_accounts::<DefaultEnvironment>();//uentas predeterminadas utilizadas para tests
+            
+            eleccion.usuarios_pendientes.push((accounts.alice, TIPO_DE_USUARIO::VOTANTE));
+            
+            assert!(eleccion.contiene_usuario_pendiente(accounts.alice));
+            assert!(!eleccion.contiene_usuario_pendiente(accounts.bob));
+        }
+    
+        #[test]
+        fn test_existe_candidato() {
+            let mut eleccion = setup_eleccion();
+            let accounts = default_accounts::<DefaultEnvironment>();
+            
+            eleccion.candidatos.push(CandidatoConteo {
+                id: accounts.alice,
+                candidato_id: 1,
+                votos_totales: 0,
+            });
+    
+            assert!(eleccion.existe_candidato(1));
+            assert!(!eleccion.existe_candidato(2));
+        }
+    
+        #[test]
+        fn test_votar_candidato() {
+            let mut eleccion = setup_eleccion();
+            let accounts = default_accounts::<DefaultEnvironment>();
+    
+            eleccion.candidatos.push(CandidatoConteo {
+                id: accounts.alice,
+                candidato_id: 1,
+                votos_totales: 0,
+            });
+    
+            eleccion.votantes.push(Votante {
+                id: accounts.bob,
+                voto_emitido: false,
+            });
+    
+            let result = eleccion.votar_candidato(accounts.bob, 1);
+            assert_eq!(result, Ok(String::from("Voto emitido exitosamente.")));
+            assert!(eleccion.votantes[0].voto_emitido);
+            assert_eq!(eleccion.candidatos[0].votos_totales, 1);
+        }
+    
+        #[test]
+        fn test_procesar_siguiente_usuario_pendiente() {
+            let mut eleccion = setup_eleccion();
+            let accounts = default_accounts::<DefaultEnvironment>();
+    
+            eleccion.usuarios_pendientes.push((accounts.alice, TIPO_DE_USUARIO::VOTANTE));
+            eleccion.usuarios_pendientes.push((accounts.bob, TIPO_DE_USUARIO::CANDIDATO));
+    
+            let result = eleccion.procesar_siguiente_usuario_pendiente(true);
+            assert_eq!(result, Ok(String::from("Usuario agregado exitosamente.")));
+            assert_eq!(eleccion.votantes.len(), 1);
+            assert_eq!(eleccion.candidatos.len(), 0);
+    
+            let result = eleccion.procesar_siguiente_usuario_pendiente(true);
+            assert_eq!(result, Ok(String::from("Usuario agregado exitosamente.")));
+            assert_eq!(eleccion.votantes.len(), 1);
+            assert_eq!(eleccion.candidatos.len(), 1);
+    
+            let result = eleccion.procesar_siguiente_usuario_pendiente(false);
+            assert_eq!(result, Err(String::from("No hay usuarios pendientes.")));
+        }
+
+        #[test]
+        fn test_obtener_informacion_candidato() {
+            let mut eleccion = setup_eleccion();
+            let accounts = default_accounts::<DefaultEnvironment>();
+            eleccion.candidatos.push(CandidatoConteo {
+                id: accounts.alice,
+                candidato_id: 1,
+                votos_totales: 0,
+            });
+            eleccion.candidatos.push(CandidatoConteo {
+                id: accounts.bob,
+                candidato_id: 2,
+                votos_totales: 0,
+            });
+
+            let candidato_info = eleccion.obtener_informacion_candidato(1);
+            assert!(candidato_info.is_some());
+            assert_eq!(candidato_info.unwrap().id, accounts.alice);
+
+            let candidato_info = eleccion.obtener_informacion_candidato(2);
+            assert!(candidato_info.is_some());
+            assert_eq!(candidato_info.unwrap().id, accounts.bob);
+    
+            let candidato_info = eleccion.obtener_informacion_candidato(3);
+            assert!(candidato_info.is_none());
+        }
+        
+
+
+    fn crear_usuario(id: AccountId, nombre: &str, apellido: &str, dni: &str) -> Usuario {
+        Usuario {
+            id,
+            nombre: nombre.to_string(),
+            apellido: apellido.to_string(),
+            dni: dni.to_string(),
+        }
+    }
+    fn crear_trabajo_final(administrador: AccountId) -> TrabajoFinal {
+        TrabajoFinal {
+            administrador,
+            registro_activado: false,
+            usuarios: Vec::new(),
+            usuarios_pendientes: Vec::new(),
+            usuarios_rechazados: Vec::new(),
+            elecciones: Vec::new(),
+        }
+    }
+
+    #[ink::test]
+    fn test_obtener_usuario() {
+        let accounts = default_accounts::<DefaultEnvironment>();
+        let id: AccountId = accounts.alice;
+        let mut trabajo_final = TrabajoFinal::new();
+        let usuario = crear_usuario(id, "Juan", "Perez", "12345678");
+        trabajo_final.usuarios.push(usuario);
+
+        let result = trabajo_final.obtener_usuario(id);
+        assert!(result.is_some());
+        let user = result.unwrap();
+        assert_eq!(user.nombre, "Juan");
+        assert_eq!(user.apellido, "Perez");
+        assert_eq!(user.dni, "12345678");
+    }
+
+    #[ink::test]
+    fn test_es_usuario_registrado() {
+        let accounts = default_accounts::<DefaultEnvironment>();
+        let id: AccountId = accounts.alice;
+        let mut trabajo_final = TrabajoFinal::new();
+        let usuario = crear_usuario(id, "Juan", "Perez", "12345678");
+        trabajo_final.usuarios.push(usuario);
+
+        assert!(trabajo_final.es_usuario_registrado());
+    }
+
+    #[ink::test]
+    fn test_es_usuario_pendiente() {
+        let accounts = default_accounts::<DefaultEnvironment>();
+        let id: AccountId = accounts.alice;
+        let mut trabajo_final = TrabajoFinal::new();
+        let usuario = crear_usuario(id, "Juan", "Perez", "12345678");
+        trabajo_final.usuarios_pendientes.push(usuario);
+
+        assert!(trabajo_final.es_usuario_pendiente());
+    }
+
+    #[test]
+    fn test_existe_eleccion() {
+        let id: AccountId = [0; 32].into();
+        let mut trabajo_final = crear_trabajo_final(id);
+        let eleccion = setup_eleccion();
+        trabajo_final.elecciones.push(eleccion);
+
+        assert!(trabajo_final.existe_eleccion(1));
+        assert!(!trabajo_final.existe_eleccion(2));
+    }
+
+    #[test]
+    fn test_obtener_eleccion_por_id() {
+        let id: AccountId = [0; 32].into();
+        let mut trabajo_final = crear_trabajo_final(id);
+        let eleccion = setup_eleccion();
+        trabajo_final.elecciones.push(eleccion);
+
+        let result = trabajo_final.obtener_eleccion_por_id(1);
+        assert!(result.is_some());
+        let eleccion_obtenida = result.unwrap();
+        assert_eq!(eleccion_obtenida.id, 1);
+
+        assert!(trabajo_final.obtener_eleccion_por_id(2).is_none());
+    }
+
+    }
+
+   
 }
+
+
+
