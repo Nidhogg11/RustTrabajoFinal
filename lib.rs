@@ -184,6 +184,7 @@ mod TrabajoFinal {
             }
         }
 
+
         fn obtener_usuario(&self, id:AccountId) -> Option<&Usuario> {
             let id = self.env().caller();
             self.usuarios.iter().find(|usuario| usuario.id == id)
@@ -249,7 +250,12 @@ mod TrabajoFinal {
             Ok(eleccion)
         }
 
-        /// Utilizado por un administrador.
+        fn crear_eleccion_privado(&mut self, fecha_inicial: String, fecha_final: String) -> Result<String, String> {
+            self.crear_eleccion(fecha_inicial, fecha_final)
+        }
+
+
+         /// Utilizado por un administrador.
         /// Crea una elección colocando fecha de inicio y final.
         #[ink(message)]
         pub fn crear_eleccion(&mut self, fecha_inicial:String, fecha_final:String) -> Result<String, String>
@@ -284,12 +290,16 @@ mod TrabajoFinal {
             return Ok(format!("Eleccion creada exitosamente. Id de la elección: {}", eleccion_id));
         }
 
+
+        fn ingresar_a_eleccion_privado(&mut self, eleccion_id:u64, tipo:TIPO_DE_USUARIO) -> Result<String, String>
+        {
+            self.ingresar_a_eleccion(eleccion_id,tipo)
+        }
+
         /// Utilizado por los usuarios registrados en el sistema para poder ingresar a una elección.
         /// Un usuario registrado y que no está registrado en la elección puede ingresar a la misma como candidato o votante.
         /// Estos no pueden ingresar a la misma si esta ya comenzó su periodo de votación o ya terminó la elección.
-        /// Para ingresar como candidato es necesario una candidatura.
-       
-        
+        /// Para ingresar como candidato es necesario una candidatura.   
         #[ink(message)]
         pub fn ingresar_a_eleccion(&mut self, eleccion_id:u64, tipo:TIPO_DE_USUARIO) -> Result<String, String>
         {
@@ -352,6 +362,12 @@ mod TrabajoFinal {
             return Ok(String::from("Se transfirió el rol de administrador correctamente."));
         }
 
+
+        fn votar_a_candidato_privado(&mut self, eleccion_id:u64, candidato_id:u32) -> Result<String, String>
+        {
+            self.votar_a_candidato(eleccion_id, candidato_id)
+        }
+
         /// Utilizado por los usuarios registrados en el sistema y que están en la elección como votantes.
         /// Si el usuario ya emitió su voto, no puede volver a votar en la misma elección.
         /// Si el usuario no es votante, no puede votar.
@@ -404,6 +420,12 @@ mod TrabajoFinal {
             return Ok(informacion);
         }
 
+
+        fn obtener_informacion_siguiente_usuario_pendiente_privado(&self) -> Result<String, String>
+        {
+            self.obtener_informacion_siguiente_usuario_pendiente()
+        }
+
         /// Utilizado por un Administrador.
         /// Obtiene la información del próximo usuario a registrarse.
         #[ink(message)]
@@ -420,6 +442,11 @@ mod TrabajoFinal {
                 },
                 None => Err(String::from("No hay usuarios pendientes.")),
             }
+        }
+
+        fn procesar_siguiente_usuario_pendiente_privado(&mut self, aceptar_usuario:bool) -> Result<String, String>
+        {
+            self.procesar_siguiente_usuario_pendiente(aceptar_usuario)
         }
 
         /// Utilizado por un Administrador.
@@ -444,6 +471,11 @@ mod TrabajoFinal {
             return Ok(String::from("Usuario rechazado exitosamente."));
         }
 
+        fn activar_registro_privado(&mut self) -> Result<String, String>
+        {
+            self.activar_registro()
+        }
+
         /// Utilizado por un administrador.
         /// Activa el registro de usuarios si no está activo el registro.
         #[ink(message)]
@@ -455,6 +487,11 @@ mod TrabajoFinal {
             return Ok(String::from("Se activó el registro para los usuarios."));
         }
 
+
+        fn registrarse_privado(&mut self, nombre:String, apellido:String, dni:String) -> Result<String, String>
+        {
+            self.registrarse(nombre, apellido, dni)
+        }
         /// Utilizado por los usuarios para poder registrarse en el sistema.
         /// Luego de registrarse queda pendiente de aceptación por parte de un Administrador.
         /// Si tu registro es rechazado, no podrás volver a intentar registrarte.
