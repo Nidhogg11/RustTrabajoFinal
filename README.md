@@ -13,6 +13,7 @@
 - [x] Transferir administrador (Administrador)
 - [ ] Obtener conteo de votos (Todos) [Dato: El conteo se realiza si una persona cualquiera es la primera en querer ver los resultados, después se deberían de almacenar en la blockchain y listo. Aparte de eso, el conteo no debería de realizarse si la votación no finalizó (checkear tiempos)]
 - [ ] Tests
+- [ ] Documentacion
 
 Generación de reportes (Otro contrato):
 - [ ] Crear contrato
