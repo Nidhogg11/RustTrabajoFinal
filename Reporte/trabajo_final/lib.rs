@@ -1,4 +1,7 @@
 #![cfg_attr(not(feature = "std"), no_std, no_main)]
+
+pub use self::TrabajoFinal::TrabajoFinalRef;
+
 #[ink::contract]
 mod TrabajoFinal {
     use ink::prelude::string::String;
@@ -163,6 +166,7 @@ mod TrabajoFinal {
     #[ink(storage)]
     pub struct TrabajoFinal {
         administrador:AccountId,
+        generador_reportes:Option<AccountId>,
         registro_activado:bool,
         usuarios:Vec<Usuario>,
         usuarios_pendientes:Vec<Usuario>,
@@ -175,6 +179,7 @@ mod TrabajoFinal {
         pub fn new() -> Self {
             Self { 
                 administrador: Self::env().caller(),
+                generador_reportes: None,
                 registro_activado: false,
                 usuarios: Vec::new(),
                 usuarios_pendientes: Vec::new(),
@@ -230,6 +235,11 @@ mod TrabajoFinal {
             return None;
         }
 
+        fn es_generador_reportes(&self) -> bool
+        {
+            self.generador_reportes.is_some() && self.env().caller() == self.generador_reportes.unwrap()
+        }
+
         fn es_administrador(&self) -> bool
         {
             self.env().caller() == self.administrador
@@ -255,9 +265,7 @@ mod TrabajoFinal {
         fn crear_eleccion_privado(&mut self, fecha_inicial: String, fecha_final: String) -> Result<String, String> {
             self.crear_eleccion(fecha_inicial, fecha_final)
         }
-
-
-         /// Utilizado por un administrador.
+        /// Utilizado por un administrador.
         /// Crea una elección colocando fecha de inicio y final.
         #[ink(message)]
         pub fn crear_eleccion(&mut self, fecha_inicial:String, fecha_final:String) -> Result<String, String>
@@ -532,6 +540,40 @@ mod TrabajoFinal {
             };
             return eleccion_elegida.procesar_siguiente_usuario_pendiente(aceptar_usuario);
         }
+
+
+
+
+        #[ink(message)]
+        pub fn obtener_datos_reporte(&mut self, eleccion_id: u64) -> Result<Vec<u64>, String>
+        {
+            if !self.es_administrador() { return Err(ERRORES::NO_ES_ADMINISTRADOR.to_string()); }
+            if !self.es_generador_reportes() { return Err(String::from("No es el generador de reportes!")); }
+            let mut vector = Vec::new();
+            vector.push(93);
+            vector.push(159);
+            vector.push(24);
+            vector.push(32);
+            vector.push(149);
+            vector.push(52);
+            Ok(vector)
+        }
+
+        // #[ink(message)]
+        // pub fn obtener_votantes_eleccion_por_id(&mut self, eleccion_id: u64) -> Result<Vec<Votante>, String>
+        // {
+        //     if !self.es_administrador() { return Err(ERRORES::NO_ES_ADMINISTRADOR.to_string()); }
+        //     if !self.es_generador_reportes() { return Err(String::from("No es el generador de reportes!")); }
+        //     let eleccion_option = self.obtener_eleccion_por_id(eleccion_id);
+        //     match eleccion_option {
+        //         Some(eleccion) => {
+        //             if eleccion.votacion_iniciada { return Err(String::from("La eleccion no finalizo aun!")) };
+   
+        //             Ok(eleccion.votantes)
+        //         },
+        //         None => Err(String::from("La eleccion enviada no existe!")),
+        //     }
+        // }
     }
    
         
@@ -681,6 +723,7 @@ mod TrabajoFinal {
     fn crear_trabajo_final(administrador: AccountId) -> TrabajoFinal {
         TrabajoFinal {
             administrador,
+            generador_reportes: None,
             registro_activado: false,
             usuarios: Vec::new(),
             usuarios_pendientes: Vec::new(),
