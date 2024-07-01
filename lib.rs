@@ -3,6 +3,7 @@
 mod TrabajoFinal {
     use ink::prelude::string::String;
     use ink::prelude::vec::Vec;
+    //use ink_e2e::subxt_signer::bip39::serde::de::value;
     use scale_info::prelude::format;
     use ink::prelude::string::ToString;
 
@@ -32,7 +33,7 @@ mod TrabajoFinal {
         }
     }
 
-    #[derive(scale::Decode, scale::Encode, Debug)]
+    #[derive(scale::Decode, scale::Encode, Debug,Clone)]
     #[cfg_attr(feature = "std", derive(scale_info::TypeInfo, ink::storage::traits::StorageLayout))]
     struct Usuario
     {
@@ -253,15 +254,7 @@ mod TrabajoFinal {
         }
 
         fn crear_eleccion_privado(&mut self, fecha_inicial: String, fecha_final: String) -> Result<String, String> {
-            self.crear_eleccion(fecha_inicial, fecha_final)
-        }
-
-
-         /// Utilizado por un administrador.
-        /// Crea una elección colocando fecha de inicio y final.
-        #[ink(message)]
-        pub fn crear_eleccion(&mut self, fecha_inicial:String, fecha_final:String) -> Result<String, String>
-        {
+            
             if !self.es_administrador() { return Err(ERRORES::NO_ES_ADMINISTRADOR.to_string()); }
 
             let fecha_inicial_milisegundos = chrono::NaiveDateTime::parse_from_str(&fecha_inicial, "%d-%m-%Y %H:%M");
@@ -290,20 +283,20 @@ mod TrabajoFinal {
             self.elecciones.push(eleccion);
 
             return Ok(format!("Eleccion creada exitosamente. Id de la elección: {}", eleccion_id));
+            
+        }
+
+
+         /// Utilizado por un administrador.
+        /// Crea una elección colocando fecha de inicio y final.
+        #[ink(message)]
+        pub fn crear_eleccion(&mut self, fecha_inicial:String, fecha_final:String) -> Result<String, String>
+        {
+            self.crear_eleccion_privado(fecha_inicial, fecha_final)
         }
 
 
         fn ingresar_a_eleccion_privado(&mut self, eleccion_id:u64, tipo:TIPO_DE_USUARIO) -> Result<String, String>
-        {
-            self.ingresar_a_eleccion(eleccion_id,tipo)
-        }
-
-        /// Utilizado por los usuarios registrados en el sistema para poder ingresar a una elección.
-        /// Un usuario registrado y que no está registrado en la elección puede ingresar a la misma como candidato o votante.
-        /// Estos no pueden ingresar a la misma si esta ya comenzó su periodo de votación o ya terminó la elección.
-        /// Para ingresar como candidato es necesario una candidatura.   
-        #[ink(message)]
-        pub fn ingresar_a_eleccion(&mut self, eleccion_id:u64, tipo:TIPO_DE_USUARIO) -> Result<String, String>
         {
             if !self.es_usuario_registrado() { return Err(ERRORES::USUARIO_NO_REGISTRADO.to_string()); }
             let id = self.env().caller();
@@ -327,6 +320,16 @@ mod TrabajoFinal {
 
             return Ok(String::from("Ingresó a la elección correctamente Pendiente de aprobacion del Administrador"));
               
+        }
+
+        /// Utilizado por los usuarios registrados en el sistema para poder ingresar a una elección.
+        /// Un usuario registrado y que no está registrado en la elección puede ingresar a la misma como candidato o votante.
+        /// Estos no pueden ingresar a la misma si esta ya comenzó su periodo de votación o ya terminó la elección.
+        /// Para ingresar como candidato es necesario una candidatura.   
+        #[ink(message)]
+        pub fn ingresar_a_eleccion(&mut self, eleccion_id:u64, tipo:TIPO_DE_USUARIO) -> Result<String, String>
+        {
+            self.ingresar_a_eleccion_privado(eleccion_id,tipo)
         }
 
         /// Utilizado por el administrador.
@@ -367,16 +370,6 @@ mod TrabajoFinal {
 
         fn votar_a_candidato_privado(&mut self, eleccion_id:u64, candidato_id:u32) -> Result<String, String>
         {
-            self.votar_a_candidato(eleccion_id, candidato_id)
-        }
-
-        /// Utilizado por los usuarios registrados en el sistema y que están en la elección como votantes.
-        /// Si el usuario ya emitió su voto, no puede volver a votar en la misma elección.
-        /// Si el usuario no es votante, no puede votar.
-        /// Si el periodo de la votación no comenzó o terminó, no puede votar.
-        #[ink(message)]
-        pub fn votar_a_candidato(&mut self, eleccion_id:u64, candidato_id:u32) -> Result<String, String>
-        {
             if !self.es_usuario_registrado() { return Err(ERRORES::USUARIO_NO_REGISTRADO.to_string()); }
             let id = self.env().caller();
             let block_timestamp = self.env().block_timestamp();
@@ -399,10 +392,20 @@ mod TrabajoFinal {
             }
         }
 
+        /// Utilizado por los usuarios registrados en el sistema y que están en la elección como votantes.
+        /// Si el usuario ya emitió su voto, no puede volver a votar en la misma elección.
+        /// Si el usuario no es votante, no puede votar.
+        /// Si el periodo de la votación no comenzó o terminó, no puede votar.
+        #[ink(message)]
+        pub fn votar_a_candidato(&mut self, eleccion_id:u64, candidato_id:u32) -> Result<String, String>
+        {
+            self.votar_a_candidato_privado(eleccion_id, candidato_id)
+        }
+
         /// Utilizado por los usuarios registrados en el sistema y que están en la elección ingresada.
         /// Se utiliza para poder obtener información de algún candidato en específico.
         /// Las IDs de los candidatos van de 1 a N.
-        pub fn obtener_informacion_candidato(&self, eleccion_id:u64, candidato_id:u32) -> Result<String, String>
+        pub fn obtener_informacion_candidato(&self, eleccion_id:u64, candidato_id:u32) -> Result<&CandidatoConteo, String>
         {
             let eleccion_elegida = match self.obtener_ref_eleccion_por_id(eleccion_id) {
                 Some(eleccion) => eleccion,
@@ -412,26 +415,12 @@ mod TrabajoFinal {
                 Some(candidato) => candidato,
                 None => return Err(String::from("No existe una candidato con ese id."))
             };
-            let usuario = self.obtener_usuario(candidato_elegido.id).unwrap();
-
-            let mut informacion = String::from("Nombre: ");
-            informacion.push_str(&usuario.nombre);
-            informacion.push_str("\nApellido: ");
-            informacion.push_str(&usuario.apellido);
-
-            return Ok(informacion);
+    
+            return Ok(candidato_elegido);
         }
 
 
         fn obtener_informacion_siguiente_usuario_pendiente_privado(&self) -> Result<String, String>
-        {
-            self.obtener_informacion_siguiente_usuario_pendiente()
-        }
-
-        /// Utilizado por un Administrador.
-        /// Obtiene la información del próximo usuario a registrarse.
-        #[ink(message)]
-        pub fn obtener_informacion_siguiente_usuario_pendiente(&self) -> Result<String, String>
         {
             if !self.es_administrador() { return Err(ERRORES::NO_ES_ADMINISTRADOR.to_string()); }
             let sig_usuario = self.usuarios_pendientes.first();
@@ -443,21 +432,18 @@ mod TrabajoFinal {
                     return Ok(str);
                 },
                 None => Err(String::from("No hay usuarios pendientes.")),
-            }
-        }
-
-        fn procesar_siguiente_usuario_pendiente_privado(&mut self, aceptar_usuario:bool) -> Result<String, String>
-        {
-            self.procesar_siguiente_usuario_pendiente(aceptar_usuario)
+            }        
         }
 
         /// Utilizado por un Administrador.
-        /// Se procesará el próximo usuario pendiente.
-        /// Para obtener la información del mismo, utilizar obtenerInformacionSiguienteUsuarioPendiente
-        /// Si se acepta el usuario, podrá utilizar el sistema.
-        /// Si se rechaza el usuario, este no podrá volver a intentar registrarse en el sistema.
+        /// Obtiene la información del próximo usuario a registrarse.
         #[ink(message)]
-        pub fn procesar_siguiente_usuario_pendiente(&mut self, aceptar_usuario:bool) -> Result<String, String>
+        pub fn obtener_informacion_siguiente_usuario_pendiente(&self) -> Result<String, String>
+        {
+            self.obtener_informacion_siguiente_usuario_pendiente_privado()
+        }
+
+        fn procesar_siguiente_usuario_pendiente_privado(&mut self, aceptar_usuario:bool) -> Result<String, String>
         {
             if !self.es_administrador() { return Err(ERRORES::NO_ES_ADMINISTRADOR.to_string()); }
             let sig_usuario = self.usuarios_pendientes.first();
@@ -473,9 +459,24 @@ mod TrabajoFinal {
             return Ok(String::from("Usuario rechazado exitosamente."));
         }
 
+        /// Utilizado por un Administrador.
+        /// Se procesará el próximo usuario pendiente.
+        /// Para obtener la información del mismo, utilizar obtenerInformacionSiguienteUsuarioPendiente
+        /// Si se acepta el usuario, podrá utilizar el sistema.
+        /// Si se rechaza el usuario, este no podrá volver a intentar registrarse en el sistema.
+        #[ink(message)]
+        pub fn procesar_siguiente_usuario_pendiente(&mut self, aceptar_usuario:bool) -> Result<String, String>
+        {
+            self.procesar_siguiente_usuario_pendiente_privado(aceptar_usuario)
+        }
+
         fn activar_registro_privado(&mut self) -> Result<String, String>
         {
-            self.activar_registro()
+            if !self.es_administrador() { return Err(ERRORES::NO_ES_ADMINISTRADOR.to_string()); }
+            if self.registro_activado { return Err(String::from("El registro ya está activado.")); }
+            self.registro_activado = true;
+            return Ok(String::from("Se activó el registro para los usuarios."));
+
         }
 
         /// Utilizado por un administrador.
@@ -483,22 +484,11 @@ mod TrabajoFinal {
         #[ink(message)]
         pub fn activar_registro(&mut self) -> Result<String, String>
         {
-            if !self.es_administrador() { return Err(ERRORES::NO_ES_ADMINISTRADOR.to_string()); }
-            if self.registro_activado { return Err(String::from("El registro ya está activado.")); }
-            self.registro_activado = true;
-            return Ok(String::from("Se activó el registro para los usuarios."));
+            self.activar_registro_privado()
         }
 
 
         fn registrarse_privado(&mut self, nombre:String, apellido:String, dni:String) -> Result<String, String>
-        {
-            self.registrarse(nombre, apellido, dni)
-        }
-        /// Utilizado por los usuarios para poder registrarse en el sistema.
-        /// Luego de registrarse queda pendiente de aceptación por parte de un Administrador.
-        /// Si tu registro es rechazado, no podrás volver a intentar registrarte.
-        #[ink(message)]
-        pub fn registrarse(&mut self, nombre:String, apellido:String, dni:String) -> Result<String, String>
         {
             if !self.registro_activado { return Err(String::from("El registro todavía no está activado.")); }
             let id = self.env().caller();
@@ -517,6 +507,14 @@ mod TrabajoFinal {
             let usuario = Usuario { id, nombre, apellido, dni };
             self.usuarios_pendientes.push(usuario);
             return Ok(String::from("Registro exitoso. Se te añadió en la cola de usuarios pendientes."));
+        }
+        /// Utilizado por los usuarios para poder registrarse en el sistema.
+        /// Luego de registrarse queda pendiente de aceptación por parte de un Administrador.
+        /// Si tu registro es rechazado, no podrás volver a intentar registrarte.
+        #[ink(message)]
+        pub fn registrarse(&mut self, nombre:String, apellido:String, dni:String) -> Result<String, String>
+        {
+            self.registrarse_privado(nombre, apellido, dni)
         }
 
          /// Utilizado por un Administrador.
@@ -1006,9 +1004,11 @@ mod TrabajoFinal {
             // Usuario registrado
             let usuario_registrado = AccountId::from([0x2; 32]);
             let usuario = crear_usuario(usuario_registrado, "Juan", "Perez", "12345678");
+            let usuario_clonado = usuario.clone();
             contrato.usuarios.push(usuario);
             let id=contrato.usuarios[0].id;
             assert_eq!(id,usuario_registrado);
+
     
             // Crear una elección válida
             let resultado_creacion = contrato.crear_eleccion(
@@ -1023,14 +1023,11 @@ mod TrabajoFinal {
             let result = contrato.procesar_usuarios_en_una_eleccion(1, true);
             assert_eq!(result, Ok(String::from("Usuario agregado exitosamente.")));
 
-            /*
+            
             // Obtener información del candidato
+            
             let resultado_info = contrato.obtener_informacion_candidato(1, 1);
-            assert_eq!(
-                resultado_info,
-                Ok("Nombre: Juan\nApellido: Perez".to_string())
-            );
-            */
+            assert_eq!(resultado_info.unwrap().id, usuario_clonado.id);
             // Caso: Elección no existente
             let resultado_info = contrato.obtener_informacion_candidato(2, 1);
             assert_eq!(
