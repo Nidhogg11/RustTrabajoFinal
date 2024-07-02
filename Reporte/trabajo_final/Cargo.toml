@@ -6,7 +6,7 @@ edition = "2021"
 
 [dependencies]
 chrono = { version = "0.4.38", default-features = false }
-ink = { version = "5.0.0", default-features = false }
+ink = { version = "4.2.9", default-features = false }
 scale = { package = "parity-scale-codec", version = "3", default-features = false, features = ["derive"] }
 scale-info = { version = "2.3", default-features = false, features = ["derive"] }
 #ink_lang = "3.0"

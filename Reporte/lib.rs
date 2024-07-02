@@ -16,12 +16,9 @@
 
 #[ink::contract]
 mod Reporte {
-    use ink::prelude::string::String;
     use ink::prelude::vec::Vec;
-    use scale_info::prelude::format;
-    use ink::prelude::string::ToString;
-
     use TrabajoFinal::TrabajoFinalRef;
+    use scale_info::prelude::string::String;
     
     #[ink(storage)]
     pub struct Reporte {
@@ -31,18 +28,23 @@ mod Reporte {
     impl Reporte {
         /// Constructor that initializes the `bool` value to the given `init_value`.
         #[ink(constructor)]
-        pub fn new(_trabajo_final: TrabajoFinalRef) -> Self {
-            Self { trabajo_final: _trabajo_final }
+        pub fn new(trabajo_final_code_hash: Hash) -> Self {
+            let trabajo_final = TrabajoFinalRef::new()
+                .code_hash(trabajo_final_code_hash)
+                .endowment(0)
+                .salt_bytes(Vec::new())
+                .instantiate();
+        
+            Self { trabajo_final }
         }
         
         #[ink(message)]
-        pub fn test(&mut self, id_eleccion: u64) -> Result<String, String> {
+        pub fn test(&mut self) -> Result<u64, String> {
            match self.trabajo_final.obtener_datos_reporte(1) {
-               Err(e) => Err(e),
-               Ok(value) => {
-                let suma = value.iter().min().unwrap_or(&10000).to_string();
-                Ok(String::from("Tremendos datos: ") + &suma.as_str())
-            }
+                Err(e) => Err(e),
+                Ok(value) => {
+                    Ok(value[0])
+                }
            }
         }
 

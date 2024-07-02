@@ -237,7 +237,10 @@ mod TrabajoFinal {
 
         fn es_generador_reportes(&self) -> bool
         {
-            self.generador_reportes.is_some() && self.env().caller() == self.generador_reportes.unwrap()
+            match self.generador_reportes { 
+                None => false,
+                Some(val) => self.env().caller() == val
+            }
         }
 
         fn es_administrador(&self) -> bool
@@ -365,11 +368,27 @@ mod TrabajoFinal {
 
         /// Utilizado por el administrador.
         /// Permite al administrador transferir el rol de administrador a otra persona.
+        #[ink(message)]
         pub fn transferir_administrador(&mut self, id:AccountId) -> Result<String, String>
         {
             if !self.es_administrador() { return Err(ERRORES::NO_ES_ADMINISTRADOR.to_string()); }
             self.administrador = id;
             return Ok(String::from("Se transfirió el rol de administrador correctamente."));
+        }
+
+        /// Utilizado por el administrador.
+        #[ink(message)]
+        pub fn asignar_generador_reportes(&mut self, id:AccountId) -> Result<String, String>
+        {
+            if !self.es_administrador() { return Err(ERRORES::NO_ES_ADMINISTRADOR.to_string()); }
+            self.generador_reportes = Some(id);
+            return Ok(String::from("Se asigno el generador reportes correctamente."));
+        }
+        #[ink(message)]
+        pub fn get_generador_reportes(&mut self, id:AccountId) -> Result<Option<AccountId>, String>
+        {
+            if !self.es_administrador() { return Err(ERRORES::NO_ES_ADMINISTRADOR.to_string()); }
+            return Ok(self.generador_reportes);
         }
 
 
@@ -547,7 +566,7 @@ mod TrabajoFinal {
         #[ink(message)]
         pub fn obtener_datos_reporte(&mut self, eleccion_id: u64) -> Result<Vec<u64>, String>
         {
-            if !self.es_administrador() { return Err(ERRORES::NO_ES_ADMINISTRADOR.to_string()); }
+            // if !self.es_administrador() { return Err(ERRORES::NO_ES_ADMINISTRADOR.to_string()); }
             if !self.es_generador_reportes() { return Err(String::from("No es el generador de reportes!")); }
             let mut vector = Vec::new();
             vector.push(93);
