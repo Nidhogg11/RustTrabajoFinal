@@ -78,6 +78,7 @@ mod TrabajoFinal {
         votacion_iniciada:bool,
         fecha_inicio:u64,
         fecha_final:u64,
+        pub resultados:Option<(CandidatoConteo,CandidatoConteo,CandidatoConteo,Vec<CandidatoConteo>)>
     }
 
     impl Eleccion
@@ -269,11 +270,19 @@ mod TrabajoFinal {
             Ok(eleccion)
         }
 
-        fn obtener_resultados_eleccion(&mut self,eleccion_id: u64) -> Result<(CandidatoConteo,CandidatoConteo,CandidatoConteo,Vec<CandidatoConteo>),String>{
+        fn calcular_resultados_eleccion(&mut self,eleccion_id: u64,block_timestamp:u64) -> Result<String,String>{
             let eleccion = match self.obtener_eleccion_por_id(eleccion_id){
                 Some(eleccion) => eleccion,
                 None => return Err("No existe la eleccion!".to_string())
             };
+            // Verificar si los resultados ya fueron publicados
+            if let Some(_) = eleccion.resultados {
+                return Err("Los resultados ya fueron publicados".to_string());
+            }   
+            //Verificar que la votacion ya haya terminado
+            if eleccion.fecha_final > block_timestamp{
+                return Err("La votacion aun no finalizo!".to_string());
+            }
             let mut candidatos:Vec<CandidatoConteo> = eleccion.candidatos.clone();
             candidatos.sort_by(|a,b| b.votos_totales.cmp(&a.votos_totales));
             
@@ -284,7 +293,9 @@ mod TrabajoFinal {
             let primer_puesto = candidatos[0].clone();
             let segundo_puesto = candidatos[1].clone();
             let tercer_puesto = candidatos[2].clone();
-            return Ok((primer_puesto,segundo_puesto,tercer_puesto,candidatos));
+            let resultado = (primer_puesto,segundo_puesto,tercer_puesto,candidatos);
+            eleccion.resultados = Some(resultado);
+            return Ok("Los resultados fueron publicados exitosamente".to_string());
         }
         //  ----- Inicio Metodos publicos -------
         //  ----- Inicio Metodos publicos -------
@@ -405,6 +416,7 @@ mod TrabajoFinal {
                 votacion_iniciada:false,
                 fecha_inicio: fecha_inicial_milisegundos.unwrap().and_utc().timestamp_millis() as u64,
                 fecha_final: fecha_final_milisegundos.unwrap().and_utc().timestamp_millis() as u64,
+                resultados:None
             };
             self.elecciones.push(eleccion);
     
@@ -674,7 +686,13 @@ mod TrabajoFinal {
                 None => Err(String::from("La eleccion enviada no existe!")),
             }
         }
-
+        pub fn publicar_resultados(&mut self,eleccion_id: u64) -> Result<String,String>{
+            let timestamp= self.env().block_timestamp();
+            match self.calcular_resultados_eleccion(eleccion_id,timestamp){
+                Ok(mensaje_exitoso) => return Ok(mensaje_exitoso),
+                Err(mensaje_error) => return Err(mensaje_error)
+            };
+        }
     }
    
         
@@ -711,6 +729,7 @@ mod TrabajoFinal {
                 votacion_iniciada: false,
                 fecha_inicio: 0,
                 fecha_final: 0,
+                resultados:None
             }
         }
     
