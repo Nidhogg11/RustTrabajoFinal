@@ -1,11 +1,12 @@
 #![cfg_attr(not(feature = "std"), no_std, no_main)]
 
 pub use self::TrabajoFinal::TrabajoFinalRef;
-
+pub use TrabajoFinal::Votante;
 #[ink::contract]
 mod TrabajoFinal {
     use ink::prelude::string::String;
     use ink::prelude::vec::Vec;
+    use ink::storage::Mapping;
     use scale_info::prelude::format;
     use ink::prelude::string::ToString;
 
@@ -35,7 +36,7 @@ mod TrabajoFinal {
         }
     }
 
-    #[derive(scale::Decode, scale::Encode, Debug)]
+    #[derive(scale::Decode, scale::Encode, Debug,Clone)]
     #[cfg_attr(feature = "std", derive(scale_info::TypeInfo, ink::storage::traits::StorageLayout))]
     struct Usuario
     {
@@ -44,15 +45,18 @@ mod TrabajoFinal {
         apellido:String,
         dni:String,
     }
-
-    #[derive(scale::Decode, scale::Encode, Debug)]
+    #[derive(scale::Decode, scale::Encode, Debug,Clone)]
     #[cfg_attr(feature = "std", derive(scale_info::TypeInfo, ink::storage::traits::StorageLayout))]
-    struct Votante
+    pub struct Votante
     {
         id:AccountId,
         voto_emitido:bool,
     }
-
+    impl Votante{
+        pub fn get_voto(&self) -> bool{
+            self.voto_emitido
+        }
+    }
     #[derive(scale::Decode, scale::Encode, Debug)]
     #[cfg_attr(feature = "std", derive(scale_info::TypeInfo, ink::storage::traits::StorageLayout))]
     struct CandidatoConteo
