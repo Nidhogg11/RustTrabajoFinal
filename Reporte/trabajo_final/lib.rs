@@ -589,7 +589,6 @@ mod TrabajoFinal {
         {
             
             if !self.env().is_contract(&self.env().caller()) { 
-                ink_env::debug_println!("Caller is not a contract");
             //     return ( String::from("No es el generador de reportes - No es un contrato"), None, self.env().caller());
             }
             
