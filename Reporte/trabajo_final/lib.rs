@@ -174,6 +174,7 @@ mod TrabajoFinal {
         elecciones:Vec<Eleccion>,
     }
 
+    #[ink(impl)]
     impl TrabajoFinal {
         #[ink(constructor)]
         pub fn new() -> Self {
@@ -187,10 +188,23 @@ mod TrabajoFinal {
                 elecciones: Vec::new(),
             }
         }
+        
+        fn es_generador_reportes(&self) -> bool
+        {
+            if !self.env().is_contract(&self.env().caller()) { return false; }
+            match self.generador_reportes { 
+                None => false,
+                Some(val) => self.env().caller() == val
+            }
+        }
 
+        fn es_administrador(&self) -> bool
+        {
+            self.env().caller() == self.administrador
+        }
 
-        fn obtener_usuario(&self, id:AccountId) -> Option<&Usuario> {
-            let id = self.env().caller();
+        fn obtener_usuario(&self, id: AccountId) -> Option<&Usuario> {
+            // let id = self.env().caller();
             self.usuarios.iter().find(|usuario| usuario.id == id)
         }
 
@@ -224,31 +238,16 @@ mod TrabajoFinal {
             return None;
         }
 
-        fn obtener_ref_eleccion_por_id(&self, eleccion_id:u64) -> Option<&Eleccion>
-        {
-            if self.existe_eleccion(eleccion_id) {
-                match eleccion_id.checked_sub(1) {
-                    Some(index_valid) => return Some(&self.elecciones[index_valid as usize]),
-                    None => return None
-                }
-            }
-            return None;
-        }
-
-        fn es_generador_reportes(&self) -> bool
-        {
-            if !self.env().is_contract(&self.env().caller()) { return false; }
-            match self.generador_reportes { 
-                None => false,
-                Some(val) => self.env().caller() == val
-            }
-        }
-
-        fn es_administrador(&self) -> bool
-        {
-            self.env().caller() == self.administrador
-        }
-
+        // fn obtener_ref_eleccion_por_id(&self, eleccion_id:u64) -> Option<&Eleccion>
+        // {
+        //     if self.existe_eleccion(eleccion_id) {
+        //         match eleccion_id.checked_sub(1) {
+        //             Some(index_valid) => return Some(&self.elecciones[index_valid as usize]),
+        //             None => return None
+        //         }
+        //     }
+        //     return None;
+        // }
 
         fn validar_estado_eleccion(&mut self,eleccion_id:u64,block_timestamp:u64,id_usuario:AccountId) -> Result<&mut Eleccion,String>{
             let option_eleccion = self.obtener_eleccion_por_id(eleccion_id);
@@ -266,25 +265,113 @@ mod TrabajoFinal {
             Ok(eleccion)
         }
 
-        fn crear_eleccion_privado(&mut self, fecha_inicial: String, fecha_final: String) -> Result<String, String> {
-            self.crear_eleccion(fecha_inicial, fecha_final)
+
+        //  ----- Inicio Metodos publicos -------
+        //  ----- Inicio Metodos publicos -------
+        //  ----- Inicio Metodos publicos -------
+
+        /// Utilizado por los usuarios para poder registrarse en el sistema.
+        /// Luego de registrarse queda pendiente de aceptación por parte de un Administrador.
+        /// Si tu registro es rechazado, no podrás volver a intentar registrarte.
+        #[ink(message)]
+        pub fn registrarse(&mut self, nombre:String, apellido:String, dni:String) -> Result<String, String>
+        {
+            self.registrarse_privado(nombre, apellido, dni)
         }
+        fn registrarse_privado(&mut self, nombre:String, apellido:String, dni:String) -> Result<String, String>
+        {
+            if !self.registro_activado { return Err(String::from("El registro todavía no está activado.")); }
+            let id = self.env().caller();
+            if self.es_administrador() { return Err(String::from("Eres el administrador, no puedes registrarte.")); }
+            if self.usuarios_rechazados.contains(&id) { 
+                return Err(String::from("Tu solicitud de registro ya fue rechazada."));
+            }
+            if self.es_usuario_registrado()
+            {
+                return Err(String::from("Ya estás registrado como usuario."));
+            }
+            if self.es_usuario_pendiente()
+            {
+                return Err(String::from("Ya estás en la cola de usuarios pendientes."));    
+            }
+            let usuario = Usuario { id, nombre, apellido, dni };
+            self.usuarios_pendientes.push(usuario);
+            return Ok(String::from("Registro exitoso. Se te añadió en la cola de usuarios pendientes."));
+        }
+
+        /// Utilizado por un Administrador.
+        /// Obtiene la información del próximo usuario a registrarse.
+        #[ink(message)]
+        pub fn obtener_informacion_siguiente_usuario_pendiente(&self) -> Result<String, String>
+        {
+            self.obtener_informacion_siguiente_usuario_pendiente_privado()
+        }
+        fn obtener_informacion_siguiente_usuario_pendiente_privado(&self) -> Result<String, String>
+        {
+            if !self.es_administrador() { return Err(ERRORES::NO_ES_ADMINISTRADOR.to_string()); }
+            let sig_usuario = self.usuarios_pendientes.first();
+            match sig_usuario {
+                Some(usuario) => {
+                    let mut str = String::from("Nombre: ") + usuario.nombre.as_str();
+                    str.push_str((String::from("\nApellido: ") + usuario.apellido.as_str()).as_str());
+                    str.push_str((String::from("\nDNI: ") + usuario.apellido.as_str()).as_str());
+                    return Ok(str);
+                },
+                None => Err(String::from("No hay usuarios pendientes.")),
+            }
+        }
+
+        /// Utilizado por un Administrador.
+        /// Se procesará el próximo usuario pendiente.
+        /// Para obtener la información del mismo, utilizar obtenerInformacionSiguienteUsuarioPendiente
+        /// Si se acepta el usuario, podrá utilizar el sistema.
+        /// Si se rechaza el usuario, este no podrá volver a intentar registrarse en el sistema.
+        #[ink(message)]
+        pub fn procesar_siguiente_usuario_pendiente(&mut self, aceptar_usuario:bool) -> Result<String, String>
+        {
+            self.procesar_siguiente_usuario_pendiente_privado(aceptar_usuario)
+        }
+        fn procesar_siguiente_usuario_pendiente_privado(&mut self, aceptar_usuario:bool) -> Result<String, String>
+        {
+            if !self.es_administrador() { return Err(ERRORES::NO_ES_ADMINISTRADOR.to_string()); }
+            let sig_usuario = self.usuarios_pendientes.first();
+            if sig_usuario.is_none() { return Err(String::from("No hay usuarios pendientes.")); }
+    
+            let usuario = self.usuarios_pendientes.remove(0);
+            if aceptar_usuario { 
+                self.usuarios.push(usuario);
+                return Ok(String::from("Usuario agregado exitosamente."));
+            }
+    
+            self.usuarios_rechazados.push(usuario.id);
+            return Ok(String::from("Usuario rechazado exitosamente."));
+        }
+
+
+        //  ----- METODOS ELECCIONES -------
+        //  ----- METODOS ELECCIONES -------
+        //  ----- METODOS ELECCIONES -------
+
         /// Utilizado por un administrador.
-        /// Crea una elección colocando fecha de inicio y final.
+        /// Crea una elección colocando fecha de inicio y final (Las fechas para que se correspondan a nuestro horario GTM-3/UTC-3 hay que sumarle 3 a la hora).
         #[ink(message)]
         pub fn crear_eleccion(&mut self, fecha_inicial:String, fecha_final:String) -> Result<String, String>
         {
+            self.crear_eleccion_privado(fecha_inicial, fecha_final)
+        }
+        fn crear_eleccion_privado(&mut self, fecha_inicial: String, fecha_final: String) -> Result<String, String> 
+        {
             if !self.es_administrador() { return Err(ERRORES::NO_ES_ADMINISTRADOR.to_string()); }
-
-            let fecha_inicial_milisegundos = chrono::NaiveDateTime::parse_from_str(&fecha_inicial, "%d-&m-&Y &H:&M");
+    
+            let fecha_inicial_milisegundos = chrono::NaiveDateTime::parse_from_str(&fecha_inicial, "%d-%m-%Y %H:%M");
             if fecha_inicial_milisegundos.is_err() {
                 return Err(String::from("Error en el formato de la fecha inicial. Formato: dd-mm-YYYY hh:mm"));
             }
-            let fecha_final_milisegundos = chrono::NaiveDateTime::parse_from_str(&fecha_final, "%d-&m-&Y &H:&M");
+            let fecha_final_milisegundos = chrono::NaiveDateTime::parse_from_str(&fecha_final, "%d-%m-%Y %H:%M");
             if fecha_final_milisegundos.is_err() {
                 return Err(String::from("Error en el formato de la fecha final. Formato: dd-mm-YYYY hh:mm"));
             }
-
+    
             let eleccion_id = match (self.elecciones.len() as u64).checked_add(1) {
                 Some(index) => index,
                 None => return Err(String::from("Se produjo un overflow al intentar crear una elección."))
@@ -300,51 +387,20 @@ mod TrabajoFinal {
                 fecha_final: fecha_final_milisegundos.unwrap().and_utc().timestamp_millis() as u64,
             };
             self.elecciones.push(eleccion);
-
+    
             return Ok(format!("Eleccion creada exitosamente. Id de la elección: {}", eleccion_id));
         }
 
-
-        fn ingresar_a_eleccion_privado(&mut self, eleccion_id:u64, tipo:TIPO_DE_USUARIO) -> Result<String, String>
-        {
-            self.ingresar_a_eleccion(eleccion_id,tipo)
-        }
-
-        /// Utilizado por los usuarios registrados en el sistema para poder ingresar a una elección.
-        /// Un usuario registrado y que no está registrado en la elección puede ingresar a la misma como candidato o votante.
-        /// Estos no pueden ingresar a la misma si esta ya comenzó su periodo de votación o ya terminó la elección.
-        /// Para ingresar como candidato es necesario una candidatura.   
-        #[ink(message)]
-        pub fn ingresar_a_eleccion(&mut self, eleccion_id:u64, tipo:TIPO_DE_USUARIO) -> Result<String, String>
-        {
-            if !self.es_usuario_registrado() { return Err(ERRORES::USUARIO_NO_REGISTRADO.to_string()); }
-            let id = self.env().caller();
-
-            let block_timestamp = self.env().block_timestamp();
-            let result = self.validar_estado_eleccion(eleccion_id, block_timestamp, id);
-            let eleccion = match result {
-                Ok(eleccion) => eleccion,
-                Err(mensaje) => return Err(mensaje)
-            };
-            //Validar que un usuario que ya ha sido rechazado en la misma eleccion no intente volver a ponerse como pendiente 
-            if eleccion.usuarios_rechazados.contains(&id) {
-                return Err(String::from("Ya has sido rechazado no puedes ingresar a la eleccion"));
-            }
-            
-            if eleccion.contiene_usuario_pendiente(id){
-                return Err(String::from("No puedes ingresar dos veces a la misma eleccion"));
-            }
-
-            eleccion.usuarios_pendientes.push((id,tipo));
-
-            return Ok(String::from("Ingresó a la elección correctamente Pendiente de aprobacion del Administrador"));
-              
-        }
-
+                
         /// Utilizado por el administrador.
         /// El administrador puede iniciar una votación si esta no se inició cuando se alcanzó la fecha inicial de la misma.
         /// El administrador no puede iniciar si la fecha actual es menor a la fecha inicial establecida para la votación. 
+        #[ink(message)]
         pub fn iniciar_votacion(&mut self, eleccion_id:u64) -> Result<String, String>
+        {
+            self.inicir_votacion_privado(eleccion_id)
+        }
+        pub fn inicir_votacion_privado(&mut self, eleccion_id:u64) -> Result<String, String>
         {
             if !self.es_administrador() { return Err(ERRORES::NO_ES_ADMINISTRADOR.to_string()); }
             let block_timestamp = self.env().block_timestamp();
@@ -367,37 +423,89 @@ mod TrabajoFinal {
             }
         }
 
-        /// Utilizado por el administrador.
-        /// Permite al administrador transferir el rol de administrador a otra persona.
+        /// Utilizado por los usuarios registrados en el sistema para poder ingresar a una elección.
+        /// Un usuario registrado y que no está registrado en la elección puede ingresar a la misma como candidato o votante.
+        /// Estos no pueden ingresar a la misma si esta ya comenzó su periodo de votación o ya terminó la elección.
+        /// Para ingresar como candidato es necesario una candidatura.   
         #[ink(message)]
-        pub fn transferir_administrador(&mut self, id:AccountId) -> Result<String, String>
+        pub fn ingresar_a_eleccion(&mut self, eleccion_id:u64, tipo:TIPO_DE_USUARIO) -> Result<String, String>
         {
-            if !self.es_administrador() { return Err(ERRORES::NO_ES_ADMINISTRADOR.to_string()); }
-            self.administrador = id;
-            return Ok(String::from("Se transfirió el rol de administrador correctamente."));
+            self.ingresar_a_eleccion_privado(eleccion_id,tipo)
+        }
+        fn ingresar_a_eleccion_privado(&mut self, eleccion_id:u64, tipo:TIPO_DE_USUARIO) -> Result<String, String>
+        {
+            if !self.es_usuario_registrado() { return Err(ERRORES::USUARIO_NO_REGISTRADO.to_string()); }
+            let id = self.env().caller();
+
+            let block_timestamp = self.env().block_timestamp();
+            let result = self.validar_estado_eleccion(eleccion_id, block_timestamp, id);
+            let eleccion = match result {
+                Ok(eleccion) => eleccion,
+                Err(mensaje) => return Err(mensaje)
+            };
+            //Validar que un usuario que ya ha sido rechazado en la misma eleccion no intente volver a ponerse como pendiente 
+            if eleccion.usuarios_rechazados.contains(&id) {
+                return Err(String::from("Ya has sido rechazado no puedes ingresar a la eleccion"));
+            }
+            
+            if eleccion.contiene_usuario_pendiente(id){
+                return Err(String::from("No puedes ingresar dos veces a la misma eleccion"));
+            }
+
+            eleccion.usuarios_pendientes.push((id,tipo));
+
+            return Ok(String::from("Ingresó a la elección correctamente Pendiente de aprobacion del Administrador"));
         }
 
-        /// Utilizado por el administrador.
+        /// Utilizado por un Administrador.
+        /// Obtiene la información del próximo usuario a registrarse.
         #[ink(message)]
-        pub fn asignar_generador_reportes(&mut self, id:AccountId) -> Result<String, String>
+        pub fn obtener_siguiente_usuario_pendiente_en_una_eleccion(&mut self, eleccion_id:u64) -> Result<String, String>
+        {
+            self.obtener_siguiente_usuario_pendiente_en_una_eleccion_privado(eleccion_id)
+        }
+        pub fn obtener_siguiente_usuario_pendiente_en_una_eleccion_privado(&mut self, eleccion_id:u64) -> Result<String, String>
         {
             if !self.es_administrador() { return Err(ERRORES::NO_ES_ADMINISTRADOR.to_string()); }
-            self.generador_reportes = Some(id);
-            return Ok(String::from("Se asigno el generador reportes correctamente."));
+            let eleccion_elegida = match self.obtener_eleccion_por_id(eleccion_id) {
+                Some(eleccion) => eleccion,
+                None => return Err(String::from("Eleccion no encontrada")),
+            };
+            let sig_usuario = eleccion_elegida.usuarios_pendientes.first();
+            match sig_usuario {
+                Some(usuario_eleccion) => {
+                    let mut datos_usuario = String::from("Usuario: ");
+                    datos_usuario.push_str( hex::encode(usuario_eleccion.0).as_str() );
+                    match usuario_eleccion.1 {
+                        TIPO_DE_USUARIO::VOTANTE => datos_usuario.push_str("\nEl usuario quiere ser un VOTANTE"),
+                        TIPO_DE_USUARIO::CANDIDATO => datos_usuario.push_str("\nEl usuario quiere ser un CANDIDATO")
+                    };
+                    Ok(datos_usuario)
+                },
+                None => Err(String::from("No hay usuarios pendientes.")),
+            }
+        }
+
+
+        /// Utilizado por un Administrador.
+        /// Se procesará el próximo usuario pendiente en una eleccion particular.
+        /// y se lo coloca en el vector de candidato o votante en esa eleccion segun que quiera ser.
+        #[ink(message)]
+        pub fn procesar_usuarios_en_una_eleccion(&mut self, eleccion_id:u64,aceptar_usuario:bool) -> Result<String, String>
+        {
+            self.procesar_usuarios_en_una_eleccion_privado(eleccion_id,aceptar_usuario)
+        }
+        pub fn procesar_usuarios_en_una_eleccion_privado(&mut self, eleccion_id:u64,aceptar_usuario:bool) -> Result<String, String>
+        {
+            if !self.es_administrador() { return Err(ERRORES::NO_ES_ADMINISTRADOR.to_string()); }
+            
+            let eleccion_elegida = match self.obtener_eleccion_por_id(eleccion_id) {
+                Some(eleccion) => eleccion,
+                None => return Err(String::from("Eleccion no encontrada")),
+            };
+            return eleccion_elegida.procesar_siguiente_usuario_pendiente(aceptar_usuario);
         }
         
-        #[ink(message)]
-        pub fn get_generador_reportes(&mut self) -> Result<Option<AccountId>, String>
-        {
-            if !self.es_administrador() { return Err(ERRORES::NO_ES_ADMINISTRADOR.to_string()); }
-            return Ok(self.generador_reportes);
-        }
-
-        fn votar_a_candidato_privado(&mut self, eleccion_id:u64, candidato_id:u32) -> Result<String, String>
-        {
-            self.votar_a_candidato(eleccion_id, candidato_id)
-        }
-
         /// Utilizado por los usuarios registrados en el sistema y que están en la elección como votantes.
         /// Si el usuario ya emitió su voto, no puede volver a votar en la misma elección.
         /// Si el usuario no es votante, no puede votar.
@@ -405,10 +513,14 @@ mod TrabajoFinal {
         #[ink(message)]
         pub fn votar_a_candidato(&mut self, eleccion_id:u64, candidato_id:u32) -> Result<String, String>
         {
+            self.votar_a_candidato_privado(eleccion_id, candidato_id)
+        }
+        fn votar_a_candidato_privado(&mut self, eleccion_id:u64, candidato_id:u32) -> Result<String, String>
+        {
             if !self.es_usuario_registrado() { return Err(ERRORES::USUARIO_NO_REGISTRADO.to_string()); }
             let id = self.env().caller();
             let block_timestamp = self.env().block_timestamp();
-
+    
             match self.obtener_eleccion_por_id(eleccion_id) {
                 Some(eleccion) => {
                     if !eleccion.votacion_iniciada {
@@ -420,96 +532,25 @@ mod TrabajoFinal {
                     if block_timestamp > eleccion.fecha_final {
                         return Err(String::from("La votación ya finalizó."));
                     }
-
+    
                     return eleccion.votar_candidato(id, candidato_id);
                 },
                 None => return Err(String::from("No existe una elección con ese id."))
             }
         }
 
-        /// Utilizado por los usuarios registrados en el sistema y que están en la elección ingresada.
-        /// Se utiliza para poder obtener información de algún candidato en específico.
-        /// Las IDs de los candidatos van de 1 a N.
-        pub fn obtener_informacion_candidato(&self, eleccion_id:u64, candidato_id:u32) -> Result<String, String>
-        {
-            let eleccion_elegida = match self.obtener_ref_eleccion_por_id(eleccion_id) {
-                Some(eleccion) => eleccion,
-                None => return Err(String::from("No existe una elección con ese id."))
-            };
-            let candidato_elegido = match eleccion_elegida.obtener_informacion_candidato(candidato_id) {
-                Some(candidato) => candidato,
-                None => return Err(String::from("No existe una candidato con ese id."))
-            };
-            let usuario = self.obtener_usuario(candidato_elegido.id).unwrap();
-
-            let mut informacion = String::from("Nombre: ");
-            informacion.push_str(&usuario.nombre);
-            informacion.push_str("\nApellido: ");
-            informacion.push_str(&usuario.apellido);
-
-            return Ok(informacion);
-        }
-
-
-        fn obtener_informacion_siguiente_usuario_pendiente_privado(&self) -> Result<String, String>
-        {
-            self.obtener_informacion_siguiente_usuario_pendiente()
-        }
-
-        /// Utilizado por un Administrador.
-        /// Obtiene la información del próximo usuario a registrarse.
-        #[ink(message)]
-        pub fn obtener_informacion_siguiente_usuario_pendiente(&self) -> Result<String, String>
-        {
-            if !self.es_administrador() { return Err(ERRORES::NO_ES_ADMINISTRADOR.to_string()); }
-            let sig_usuario = self.usuarios_pendientes.first();
-            match sig_usuario {
-                Some(usuario) => {
-                    let mut str = String::from("Nombre: ") + usuario.nombre.as_str();
-                    str.push_str((String::from("\nApellido: ") + usuario.apellido.as_str()).as_str());
-                    str.push_str((String::from("\nDNI: ") + usuario.apellido.as_str()).as_str());
-                    return Ok(str);
-                },
-                None => Err(String::from("No hay usuarios pendientes.")),
-            }
-        }
-
-        fn procesar_siguiente_usuario_pendiente_privado(&mut self, aceptar_usuario:bool) -> Result<String, String>
-        {
-            self.procesar_siguiente_usuario_pendiente(aceptar_usuario)
-        }
-
-        /// Utilizado por un Administrador.
-        /// Se procesará el próximo usuario pendiente.
-        /// Para obtener la información del mismo, utilizar obtenerInformacionSiguienteUsuarioPendiente
-        /// Si se acepta el usuario, podrá utilizar el sistema.
-        /// Si se rechaza el usuario, este no podrá volver a intentar registrarse en el sistema.
-        #[ink(message)]
-        pub fn procesar_siguiente_usuario_pendiente(&mut self, aceptar_usuario:bool) -> Result<String, String>
-        {
-            if !self.es_administrador() { return Err(ERRORES::NO_ES_ADMINISTRADOR.to_string()); }
-            let sig_usuario = self.usuarios_pendientes.first();
-            if sig_usuario.is_none() { return Err(String::from("No hay usuarios pendientes.")); }
-
-            let usuario = self.usuarios_pendientes.remove(0);
-            if aceptar_usuario { 
-                self.usuarios.push(usuario);
-                return Ok(String::from("Usuario agregado exitosamente."));
-            }
-
-            self.usuarios_rechazados.push(usuario.id);
-            return Ok(String::from("Usuario rechazado exitosamente."));
-        }
-
-        fn activar_registro_privado(&mut self) -> Result<String, String>
-        {
-            self.activar_registro()
-        }
+        // ====-----==== METODOS USADOS POR EL ADMINISTRADOR ====----====
+        // ====-----==== METODOS USADOS POR EL ADMINISTRADOR ====----====
+        // ====-----==== METODOS USADOS POR EL ADMINISTRADOR ====----====
 
         /// Utilizado por un administrador.
         /// Activa el registro de usuarios si no está activo el registro.
         #[ink(message)]
         pub fn activar_registro(&mut self) -> Result<String, String>
+        {
+            self.activar_registro_privado()
+        }
+        fn activar_registro_privado(&mut self) -> Result<String, String>
         {
             if !self.es_administrador() { return Err(ERRORES::NO_ES_ADMINISTRADOR.to_string()); }
             if self.registro_activado { return Err(String::from("El registro ya está activado.")); }
@@ -517,111 +558,102 @@ mod TrabajoFinal {
             return Ok(String::from("Se activó el registro para los usuarios."));
         }
 
-
-        fn registrarse_privado(&mut self, nombre:String, apellido:String, dni:String) -> Result<String, String>
-        {
-            self.registrarse(nombre, apellido, dni)
-        }
-        /// Utilizado por los usuarios para poder registrarse en el sistema.
-        /// Luego de registrarse queda pendiente de aceptación por parte de un Administrador.
-        /// Si tu registro es rechazado, no podrás volver a intentar registrarte.
+        /// Utilizado por un administrador.
+        /// desActiva el registro de usuarios si no está activo el registro.
         #[ink(message)]
-        pub fn registrarse(&mut self, nombre:String, apellido:String, dni:String) -> Result<String, String>
+        pub fn desactivar_registro(&mut self) -> Result<String, String>
         {
-            if !self.registro_activado { return Err(String::from("El registro todavía no está activado.")); }
-            let id = self.env().caller();
-            if self.es_administrador() { return Err(String::from("Eres el administrador, no puedes registrarte.")); }
-            if self.usuarios_rechazados.contains(&id) { 
-                return Err(String::from("Tu solicitud de registro ya fue rechazada."));
-            }
-            if self.es_usuario_registrado()
-            {
-                return Err(String::from("Ya estás registrado como usuario."));
-            }
-            if self.es_usuario_pendiente()
-            {
-                return Err(String::from("Ya estás en la cola de usuarios pendientes."));    
-            }
-            let usuario = Usuario { id, nombre, apellido, dni };
-            self.usuarios_pendientes.push(usuario);
-            return Ok(String::from("Registro exitoso. Se te añadió en la cola de usuarios pendientes."));
+            self.desactivar_registro_privado()
+        }
+        fn desactivar_registro_privado(&mut self) -> Result<String, String>
+        {
+            if !self.es_administrador() { return Err(ERRORES::NO_ES_ADMINISTRADOR.to_string()); }
+            if !self.registro_activado { return Err(String::from("El registro ya está desactivado.")); }
+            self.registro_activado = false;
+            return Ok(String::from("Se desactivó el registro para los usuarios."));
         }
 
-         /// Utilizado por un Administrador.
-        /// Se procesará el próximo usuario pendiente en una eleccion particular.
-        /// y se lo coloca en el vector de candidato o votante en esa eleccion segun que quiera ser.
-        pub fn procesar_usuarios_en_una_eleccion(&mut self, eleccion_id:u64,aceptar_usuario:bool) -> Result<String, String>
-            {
-                if !self.es_administrador() { return Err(ERRORES::NO_ES_ADMINISTRADOR.to_string()); }
-
-               let eleccion_elegida = match self.obtener_eleccion_por_id(eleccion_id) {
-                Some(eleccion) => eleccion,
-                None => return Err(String::from("Eleccion no encontrada")),
-            };
-            return eleccion_elegida.procesar_siguiente_usuario_pendiente(aceptar_usuario);
+        /// Utilizado por el administrador.
+        /// Permite al administrador transferir el rol de administrador a otra persona.
+        #[ink(message)]
+        pub fn transferir_administrador(&mut self, id:AccountId) -> Result<String, String>
+        {
+            self.transferir_administrador_privado(id)
+        }
+        pub fn transferir_administrador_privado(&mut self, id:AccountId) -> Result<String, String>
+        {
+            if !self.es_administrador() { return Err(ERRORES::NO_ES_ADMINISTRADOR.to_string()); }
+            self.administrador = id;
+            return Ok(String::from("Se transfirió el rol de administrador correctamente."));
+        }
+        
+        /// Utilizado por el administrador.
+        #[ink(message)]
+        pub fn asignar_generador_reportes(&mut self, id:AccountId) -> Result<String, String>
+        {
+            self.asignar_generador_reportes_privado(id)
+        }
+        pub fn asignar_generador_reportes_privado(&mut self, id:AccountId) -> Result<String, String>
+        {
+            if !self.es_administrador() { return Err(ERRORES::NO_ES_ADMINISTRADOR.to_string()); }
+            self.generador_reportes = Some(id);
+            return Ok(String::from("Se asigno el generador reportes correctamente."));
         }
 
+
+        // ====-----==== METODOS PARA QUE USE EL OTRO CONTRATO ====----====
+        // ====-----==== METODOS PARA QUE USE EL OTRO CONTRATO ====----====
+        // ====-----==== METODOS PARA QUE USE EL OTRO CONTRATO ====----====
 
         #[ink(message)]
-        pub fn obtener_datos_reporte(&mut self, eleccion_id: u64) -> Result<Vec<u64>, String>
-        {
-            if !self.es_generador_reportes() { 
-                return Err(String::from("No es el generador de reportes!")); 
+        pub fn obtener_informacion_usuario(&self, user_id: AccountId) -> Option<(String, String, String)> {
+            if !self.es_generador_reportes() { return None; }
+
+            let option_usuario = self.usuarios.iter().find(|usuario| usuario.id == user_id);
+            match option_usuario {
+                None => None,
+                Some(usuario) => Some( (usuario.nombre.clone(),  usuario.apellido.clone(),  usuario.dni.clone()) )
             }
-            let mut vector = Vec::new();
-            vector.push(93);
-            vector.push(159);
-            vector.push(24);
-            vector.push(32);
-            vector.push(149);
-            vector.push(52);
-            Ok(vector)
         }
 
         #[ink(message)]
-        pub fn get_caller(&mut self) -> (Option<AccountId>, AccountId, bool)
+        pub fn obtener_votantes_eleccion_por_id(&mut self, eleccion_id: u64) -> Result<Vec<(AccountId,bool)>, String>
         {
-            ( self.generador_reportes, self.env().caller(), self.env().is_contract(&self.env().caller()) )
-        }
-
-        #[ink(message)]
-        pub fn is_generador(&mut self) -> (String, Option<AccountId>, AccountId)
-        {
+            if !self.es_generador_reportes() { return Err(String::from("No es el generador de reportes!")); }
+            let block_timestamp = self.env().block_timestamp();
             
-            if !self.env().is_contract(&self.env().caller()) { 
-            //     return ( String::from("No es el generador de reportes - No es un contrato"), None, self.env().caller());
-            }
-            
-            // Verificar si el generador_reportes está seteado
-            let gen_address = match self.generador_reportes { 
-                None => return (String::from("No es el generador de reportes - No hay ninguno seteado"), None, self.env().caller()),
-                Some(val) => val
-            };
-            
-            // Comparar la address del caller con la del generador_reportes
-            // if self.env().caller() == gen_address {
-            if self.generador_reportes.is_some_and( |addr| addr.eq(&self.env().caller()) ) {
-                (String::from("Es el generador de reportes"), self.generador_reportes, self.env().caller())
-            } else {
-                (String::from("No es el generador de reportes - No coinciden las address"), self.generador_reportes, self.env().caller())
+            let eleccion_option = self.obtener_eleccion_por_id(eleccion_id);
+            match eleccion_option {
+                Some(eleccion) => {
+                    // verificacion pobre
+                    if eleccion.fecha_final > block_timestamp {
+                        return Err(String::from("La elección no finalizó, no puedes obtener los datos."));
+                    }
+                    
+                    Ok(eleccion.votantes.iter().map(|votante| (votante.id, votante.voto_emitido)).collect())
+                },
+                None => Err(String::from("La eleccion enviada no existe!")),
             }
         }
+        #[ink(message)]
+        pub fn obtener_candidatos_eleccion_por_id(&mut self, eleccion_id: u64) -> Result<Vec<(AccountId,u32)>, String>
+        {
+            if !self.es_generador_reportes() { return Err(String::from("No es el generador de reportes!")); }
+            let block_timestamp = self.env().block_timestamp();
 
-        // #[ink(message)]
-        // pub fn obtener_votantes_eleccion_por_id(&mut self, eleccion_id: u64) -> Result<Vec<Votante>, String>
-        // {
-        //     if !self.es_administrador() { return Err(ERRORES::NO_ES_ADMINISTRADOR.to_string()); }
-        //     if !self.es_generador_reportes() { return Err(String::from("No es el generador de reportes!")); }
-        //     let eleccion_option = self.obtener_eleccion_por_id(eleccion_id);
-        //     match eleccion_option {
-        //         Some(eleccion) => {
-        //             if eleccion.votacion_iniciada { return Err(String::from("La eleccion no finalizo aun!")) };
-   
-        //             Ok(eleccion.votantes)
-        //         },
-        //         None => Err(String::from("La eleccion enviada no existe!")),
-        //     }
-        // }
+            let eleccion_option = self.obtener_eleccion_por_id(eleccion_id);
+            match eleccion_option {
+                Some(eleccion) => {
+                    // verificacion pobre
+                    if eleccion.fecha_final > block_timestamp {
+                        return Err(String::from("La elección no finalizó, no puedes obtener los datos."));
+                    }
+                    
+                    Ok(eleccion.candidatos.iter().map(|candidato| (candidato.id, candidato.votos_totales)).collect())
+                },
+                None => Err(String::from("La eleccion enviada no existe!")),
+            }
+        }
     }
    
         
