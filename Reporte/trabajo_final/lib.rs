@@ -57,7 +57,7 @@ mod TrabajoFinal {
             self.voto_emitido
         }
     }
-    #[derive(scale::Decode, scale::Encode, Debug)]
+    #[derive(scale::Decode, scale::Encode, Debug,Clone)]
     #[cfg_attr(feature = "std", derive(scale_info::TypeInfo, ink::storage::traits::StorageLayout))]
     struct CandidatoConteo
     {
@@ -269,7 +269,23 @@ mod TrabajoFinal {
             Ok(eleccion)
         }
 
-
+        fn obtener_resultados_eleccion(&mut self,eleccion_id: u64) -> Result<(CandidatoConteo,CandidatoConteo,CandidatoConteo,Vec<CandidatoConteo>),String>{
+            let eleccion = match self.obtener_eleccion_por_id(eleccion_id){
+                Some(eleccion) => eleccion,
+                None => return Err("No existe la eleccion!".to_string())
+            };
+            let mut candidatos:Vec<CandidatoConteo> = eleccion.candidatos.clone();
+            candidatos.sort_by(|a,b| b.votos_totales.cmp(&a.votos_totales));
+            
+            // Asegurarse de que hay al menos 3 candidatos
+            if candidatos.len() < 3 {
+                return Err("No hay suficientes candidatos en la eleccion!".to_string());
+            }
+            let primer_puesto = candidatos[0].clone();
+            let segundo_puesto = candidatos[1].clone();
+            let tercer_puesto = candidatos[2].clone();
+            return Ok((primer_puesto,segundo_puesto,tercer_puesto,candidatos));
+        }
         //  ----- Inicio Metodos publicos -------
         //  ----- Inicio Metodos publicos -------
         //  ----- Inicio Metodos publicos -------
@@ -658,6 +674,7 @@ mod TrabajoFinal {
                 None => Err(String::from("La eleccion enviada no existe!")),
             }
         }
+
     }
    
         
