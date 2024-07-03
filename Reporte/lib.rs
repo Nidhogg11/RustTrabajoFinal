@@ -48,19 +48,30 @@ mod Reporte {
            }
         }
 
-        // #[ink(message)]
-        // pub fn reporte_de_votantes_por_eleccion(&self, id_eleccion: u64) -> Result<String, String> {
-        //    Ok(String::from("LOREM"))
-        // }
+        #[ink(message)]
+        pub fn test_get_caller(&mut self) -> (Option<AccountId>, AccountId, bool) {
+           self.trabajo_final.get_caller()
+        }
 
-        // #[ink(message)]
-        // pub fn reporte_de_participacion_por_eleccion(&self, id_eleccion: u64) -> Result<String, String> {
-        //    Ok(String::from("LOREM"))
-        // }
+        #[ink(message)]
+        pub fn test_is_generador(&mut self) -> (String, Option<AccountId>, AccountId) {
+           let response = self.trabajo_final.is_generador();
+           (response.0, response.1, response.2)
+        }
 
-        // #[ink(message)]
-        // pub fn reporte_de_resultado_por_eleccion(&self, id_eleccion: u64) -> Result<String, String> {
-        //    Ok(String::from("LOREM"))
-        // }
+        #[ink(message)]
+        pub fn reporte_de_votantes_por_eleccion(&self, id_eleccion: u64) -> Result<String, String> {
+           Ok(String::from("LOREM"))
+        }
+
+        #[ink(message)]
+        pub fn reporte_de_participacion_por_eleccion(&self, id_eleccion: u64) -> Result<String, String> {
+           Ok(String::from("LOREM"))
+        }
+
+        #[ink(message)]
+        pub fn reporte_de_resultado_por_eleccion(&self, id_eleccion: u64) -> Result<String, String> {
+           Ok(String::from("LOREM"))
+        }
     }
 }
