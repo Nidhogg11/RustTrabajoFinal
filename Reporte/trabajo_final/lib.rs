@@ -241,6 +241,7 @@ mod TrabajoFinal {
 
         fn es_generador_reportes(&self) -> bool
         {
+            if !self.env().is_contract(&self.env().caller()) { return false; }
             match self.generador_reportes { 
                 None => false,
                 Some(val) => self.env().caller() == val && self.env().is_contract(&self.env().caller())
@@ -388,13 +389,13 @@ mod TrabajoFinal {
             self.generador_reportes = Some(id);
             return Ok(String::from("Se asigno el generador reportes correctamente."));
         }
+        
         #[ink(message)]
-        pub fn get_generador_reportes(&mut self, id:AccountId) -> Result<Option<AccountId>, String>
+        pub fn get_generador_reportes(&mut self) -> Result<Option<AccountId>, String>
         {
             if !self.es_administrador() { return Err(ERRORES::NO_ES_ADMINISTRADOR.to_string()); }
             return Ok(self.generador_reportes);
         }
-
 
         fn votar_a_candidato_privado(&mut self, eleccion_id:u64, candidato_id:u32) -> Result<String, String>
         {
@@ -565,13 +566,12 @@ mod TrabajoFinal {
         }
 
 
-
-
         #[ink(message)]
         pub fn obtener_datos_reporte(&mut self, eleccion_id: u64) -> Result<Vec<u64>, String>
         {
-            // if !self.es_administrador() { return Err(ERRORES::NO_ES_ADMINISTRADOR.to_string()); }
-            if !self.es_generador_reportes() { return Err(String::from("No es el generador de reportes!")); }
+            if !self.es_generador_reportes() { 
+                return Err(String::from("No es el generador de reportes!")); 
+            }
             let mut vector = Vec::new();
             vector.push(93);
             vector.push(159);
@@ -580,6 +580,35 @@ mod TrabajoFinal {
             vector.push(149);
             vector.push(52);
             Ok(vector)
+        }
+
+        #[ink(message)]
+        pub fn get_caller(&mut self) -> (Option<AccountId>, AccountId, bool)
+        {
+            ( self.generador_reportes, self.env().caller(), self.env().is_contract(&self.env().caller()) )
+        }
+
+        #[ink(message)]
+        pub fn is_generador(&mut self) -> (String, Option<AccountId>, AccountId)
+        {
+            
+            if !self.env().is_contract(&self.env().caller()) { 
+            //     return ( String::from("No es el generador de reportes - No es un contrato"), None, self.env().caller());
+            }
+            
+            // Verificar si el generador_reportes está seteado
+            let gen_address = match self.generador_reportes { 
+                None => return (String::from("No es el generador de reportes - No hay ninguno seteado"), None, self.env().caller()),
+                Some(val) => val
+            };
+            
+            // Comparar la address del caller con la del generador_reportes
+            // if self.env().caller() == gen_address {
+            if self.generador_reportes.is_some_and( |addr| addr.eq(&self.env().caller()) ) {
+                (String::from("Es el generador de reportes"), self.generador_reportes, self.env().caller())
+            } else {
+                (String::from("No es el generador de reportes - No coinciden las address"), self.generador_reportes, self.env().caller())
+            }
         }
 
         #[ink(message)]
