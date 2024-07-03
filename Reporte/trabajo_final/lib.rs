@@ -1,11 +1,12 @@
 #![cfg_attr(not(feature = "std"), no_std, no_main)]
 
 pub use self::TrabajoFinal::TrabajoFinalRef;
-
+pub use TrabajoFinal::Votante;
 #[ink::contract]
 mod TrabajoFinal {
     use ink::prelude::string::String;
     use ink::prelude::vec::Vec;
+    use ink::storage::Mapping;
     use scale_info::prelude::format;
     use ink::prelude::string::ToString;
 
@@ -35,7 +36,7 @@ mod TrabajoFinal {
         }
     }
 
-    #[derive(scale::Decode, scale::Encode, Debug)]
+    #[derive(scale::Decode, scale::Encode, Debug,Clone)]
     #[cfg_attr(feature = "std", derive(scale_info::TypeInfo, ink::storage::traits::StorageLayout))]
     struct Usuario
     {
@@ -44,15 +45,18 @@ mod TrabajoFinal {
         apellido:String,
         dni:String,
     }
-
-    #[derive(scale::Decode, scale::Encode, Debug)]
+    #[derive(scale::Decode, scale::Encode, Debug,Clone)]
     #[cfg_attr(feature = "std", derive(scale_info::TypeInfo, ink::storage::traits::StorageLayout))]
-    struct Votante
+    pub struct Votante
     {
         id:AccountId,
         voto_emitido:bool,
     }
-
+    impl Votante{
+        pub fn get_voto(&self) -> bool{
+            self.voto_emitido
+        }
+    }
     #[derive(scale::Decode, scale::Encode, Debug)]
     #[cfg_attr(feature = "std", derive(scale_info::TypeInfo, ink::storage::traits::StorageLayout))]
     struct CandidatoConteo
@@ -239,7 +243,7 @@ mod TrabajoFinal {
         {
             match self.generador_reportes { 
                 None => false,
-                Some(val) => self.env().caller() == val
+                Some(val) => self.env().caller() == val && self.env().is_contract(&self.env().caller())
             }
         }
 
@@ -578,21 +582,19 @@ mod TrabajoFinal {
             Ok(vector)
         }
 
-        // #[ink(message)]
-        // pub fn obtener_votantes_eleccion_por_id(&mut self, eleccion_id: u64) -> Result<Vec<Votante>, String>
-        // {
-        //     if !self.es_administrador() { return Err(ERRORES::NO_ES_ADMINISTRADOR.to_string()); }
-        //     if !self.es_generador_reportes() { return Err(String::from("No es el generador de reportes!")); }
-        //     let eleccion_option = self.obtener_eleccion_por_id(eleccion_id);
-        //     match eleccion_option {
-        //         Some(eleccion) => {
-        //             if eleccion.votacion_iniciada { return Err(String::from("La eleccion no finalizo aun!")) };
-   
-        //             Ok(eleccion.votantes)
-        //         },
-        //         None => Err(String::from("La eleccion enviada no existe!")),
-        //     }
-        // }
+        #[ink(message)]
+        pub fn obtener_votantes_eleccion_por_id(&mut self, eleccion_id: u64) -> Result<Vec<Votante>, String>
+        {
+            if !self.es_administrador() { return Err(ERRORES::NO_ES_ADMINISTRADOR.to_string()); }
+            if !self.es_generador_reportes() { return Err(String::from("No es el generador de reportes!")); }
+            let eleccion_option = self.obtener_eleccion_por_id(eleccion_id);
+            match eleccion_option {
+                    Some(eleccion) => {
+                    Ok(eleccion.votantes.clone())
+                 },
+                None => Err(String::from("La eleccion enviada no existe!")),
+             }
+            } 
     }
    
         

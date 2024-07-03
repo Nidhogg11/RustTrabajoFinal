@@ -18,6 +18,7 @@
 mod Reporte {
     use ink::prelude::vec::Vec;
     use TrabajoFinal::TrabajoFinalRef;
+    use TrabajoFinal::Votante;
     use scale_info::prelude::string::String;
     
     #[ink(storage)]
@@ -47,7 +48,32 @@ mod Reporte {
                 }
            }
         }
+        //Metodo privado para obtener los votantes de la eleccion y despues procesar la data
+        fn obtener_votantes_eleccion(&mut self,eleccion_id:u64) -> Result<Vec<Votante>,String>{
+            match self.trabajo_final.obtener_votantes_eleccion_por_id(eleccion_id){
+                Ok(votantes_eleccion) => return Ok(votantes_eleccion),
+                Err(mensaje) => return Err(mensaje)
+            };   
+        }
+        fn calcular_participacion_eleccion(){
 
+        }
+        pub fn generar_reporte_votantes(&mut self,eleccion_id:u64){
+            match self.obtener_votantes_eleccion(eleccion_id){
+
+            }
+        }
+        pub fn generar_reporte_participacion(&mut self,eleccion_id:u64) -> Result<String,String>{
+            let votantes = match self.obtener_votantes_eleccion(eleccion_id){
+                Ok(votantes) => votantes,
+                Err(mensaje) => return Err(mensaje)
+            };
+            let votos_emitidos = votantes.iter().filter(|votante| votante.get_voto()).count() as u32;
+            let cant_votantes = votantes.len() as u32;
+
+        }
+    }
+}
         // #[ink(message)]
         // pub fn reporte_de_votantes_por_eleccion(&self, id_eleccion: u64) -> Result<String, String> {
         //    Ok(String::from("LOREM"))
@@ -62,5 +88,3 @@ mod Reporte {
         // pub fn reporte_de_resultado_por_eleccion(&self, id_eleccion: u64) -> Result<String, String> {
         //    Ok(String::from("LOREM"))
         // }
-    }
-}
