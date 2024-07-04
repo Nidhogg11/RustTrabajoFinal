@@ -729,6 +729,7 @@ mod TrabajoFinal {
     #[cfg(test)]
     mod tests {
         use super::*;
+        use ink::codegen::Env;
         use ink::env::test::{
             default_accounts, get_account_balance, recorded_events,
             DefaultAccounts, EmittedEvent
@@ -1304,8 +1305,86 @@ mod TrabajoFinal {
             assert_eq!(result, Err(String::from("Eleccion no encontrada")));
         } 
 
-        
-        
+        #[ink::test]
+        fn test_ingresar_a_eleccion() {
+            
+            let accounts = get_default_test_accounts();
+            let alice = accounts.alice;
+            let charlie = accounts.charlie;
+            let bob = accounts.bob;
+            let eleccion_id: u64 = 1;
+            let tipo_usuario: TIPO_DE_USUARIO = TIPO_DE_USUARIO::VOTANTE;
+            set_caller(alice);
+    
+            let mut contract = TrabajoFinal::new();
+    
+            // Establecemos el administrador como el llamante y activamos el registro
+            contract.activar_registro().unwrap();
+            contract.crear_eleccion("01-01-2024 10:00".into(), "02-01-2024 10:00".into()).unwrap();
+    
+            // Usuario no registrado intenta ingresar a la elección
+            set_caller(charlie);
+            let result = contract.ingresar_a_eleccion(eleccion_id, tipo_usuario.clone());
+            assert_eq!(result, Err(ERRORES::USUARIO_NO_REGISTRADO.to_string()), "Error: Usuario no registrado");
+    
+            // Registramos al usuario
+            let result=contract.registrarse("Juan".into(), "Perez".into(), "12345678".into()).unwrap();
+            contract.elecciones[0].usuarios_pendientes.push((charlie, TIPO_DE_USUARIO::VOTANTE));
+            assert_eq!(result,String::from("Registro exitoso. Se te añadió en la cola de usuarios pendientes."));
+    
+            let result = contract.ingresar_a_eleccion(eleccion_id, tipo_usuario.clone());
+            assert_eq!(result, Err(ERRORES::USUARIO_NO_REGISTRADO.to_string()), "Error: Usuario no registrado");
+    
+            set_caller(alice);
+            let result = contract.procesar_usuarios_en_una_eleccion(eleccion_id, true);
+            assert_eq!(result, Ok(String::from("Usuario agregado exitosamente.")));
+    
+    
+            // Elección inexistente
+            //let result = contract.ingresar_a_eleccion_privado(3, tipo_usuario.clone());
+            //assert_eq!(result, Err("No existe una elección con ese id.".to_string()), "Error: Elección inexistente");
+    
+            // Simulamos que la votación ya inició
+            let block_timestamp = contract.env().block_timestamp() + 1_000_000; // ajustamos el timestamp
+            contract.elecciones[0].fecha_inicio = block_timestamp - 1;
+            
+            let result = contract.ingresar_a_eleccion(eleccion_id, tipo_usuario.clone());
+            assert_eq!(result, Err("La votación en la elección ya comenzó, no te puedes registrar.".to_string()), "Error: Votación ya iniciada");
+    
+            // Simulamos que la elección ya finalizó
+            contract.elecciones[0].fecha_final = block_timestamp - 1;
+    
+            let result = contract.ingresar_a_eleccion_privado(eleccion_id, tipo_usuario.clone());
+            assert_eq!(result, Err("La elección ya finalizó, no te puedes registrar.".to_string()), "Error: Elección ya finalizada");
+    
+            // Reiniciamos el estado de la elección para otros tests
+            contract.elecciones[0].fecha_inicio = block_timestamp + 1_000_000;
+            contract.elecciones[0].fecha_final = block_timestamp + 2_000_000;
+    
+            // Administrador rechaza al usuario
+            set_caller(alice);
+            contract.procesar_siguiente_usuario_pendiente(false).unwrap();
+    
+            // Usuario rechazado intenta ingresar
+            set_caller(charlie);
+            let result = contract.ingresar_a_eleccion_privado(eleccion_id, tipo_usuario.clone());
+            assert_eq!(result, Err("Ya has sido rechazado no puedes ingresar a la eleccion".to_string()), "Error: Usuario rechazado");
+    
+            // Limpiamos el estado de usuarios rechazados para continuar con el test
+            contract.elecciones[0].usuarios_rechazados.clear();
+            contract.elecciones[0].usuarios_pendientes.clear();
+    
+            // Usuario intenta ingresar correctamente
+            let result = contract.ingresar_a_eleccion_privado(eleccion_id, tipo_usuario.clone());
+            assert_eq!(result, Ok("Ingresó a la elección correctamente Pendiente de aprobacion del Administrador".to_string()), "Error: Usuario debería poder ingresar");
+    
+            // Usuario intenta ingresar dos veces a la misma elección
+            let result = contract.ingresar_a_eleccion_privado(eleccion_id, tipo_usuario);
+            assert_eq!(result, Err("No puedes ingresar dos veces a la misma eleccion".to_string()), "Error: Usuario no debería poder ingresar dos veces");
+        }
+                
+    
+    
     }
 
 }    
