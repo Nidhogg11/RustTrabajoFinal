@@ -98,7 +98,7 @@ mod TrabajoFinal {
             candidato_id >= 1 && candidato_id <= self.candidatos.len() as u32
         }
 
-        fn obtener_informacion_candidato(&self, candidato_id:u32) -> Option<&CandidatoConteo> //Quizás se debería de cambiar a un campo específico del candidato como por ejemplo discurso/ideas, y también su nombre
+        fn obtener_informacion_candidato(&self, candidato_id:u32) -> Option<&CandidatoConteo>
         {
             if !self.existe_candidato(candidato_id) { return None; }
             match (candidato_id as usize).checked_sub(1) {
@@ -671,7 +671,6 @@ mod TrabajoFinal {
             let eleccion_option = self.obtener_eleccion_por_id(eleccion_id);
             match eleccion_option {
                 Some(eleccion) => {
-                    // verificacion pobre
                     if eleccion.fecha_final > block_timestamp {
                         return Err(String::from("La elección no finalizó, no puedes obtener los datos."));
                     }
@@ -693,7 +692,6 @@ mod TrabajoFinal {
 
             match self.obtener_eleccion_por_id(eleccion_id){
                 Some(eleccion) => {
-                    // verificacion pobre
                     if eleccion.fecha_final > block_timestamp {
                         return Err(String::from("La elección no finalizó, no puedes obtener los datos."));
                     }
@@ -841,6 +839,109 @@ mod TrabajoFinal {
 
             // Asegúrate de que el resultado sea el esperado
             assert_eq!(result, Err("El registro ya está desactivado.".to_string()));
+        }
+
+        #[ink::test]
+        fn test_obtener_resultados_privado_exito() {
+            let mut contrato = TrabajoFinal::new();
+            let id_administrador = AccountId::from([1; 32]); 
+            let id_candidato_1 = AccountId::from([0x06; 32]);
+            let id_candidato_2 = AccountId::from([0x06; 32]);
+            let id_candidato_3 = AccountId::from([0x06; 32]);
+            let id_candidato_4 = AccountId::from([0x06; 32]);
+
+            let vector_votos_candidatos = vec![
+                (id_candidato_1, 13),
+                (id_candidato_4, 7),
+                (id_candidato_2, 3),
+                (id_candidato_3, 2)
+            ];
+
+            // Simular un administrador registrado
+            contrato.administrador = id_administrador;
+
+            // Simular una elección válida con usuarios pendientes
+            contrato.elecciones.push(Eleccion {
+                id: 1,
+                candidatos: vec![],
+                votantes: vec![],
+                usuarios_rechazados: vec![],
+                usuarios_pendientes: vec![],
+                votacion_iniciada: false,
+                fecha_inicio: 50, 
+                fecha_final: 100, 
+                resultados: Some(Resultados { 
+                    votos_totales: 30, 
+                    votos_realizados: 25,
+                    votos_candidatos: vector_votos_candidatos,
+                }),
+            });
+
+            ink::env::test::advance_block::<ink::env::DefaultEnvironment>();
+            ink::env::test::set_block_timestamp::<ink::env::DefaultEnvironment>(705);
+
+            let result_obtener = contrato.obtener_resultados_privado(1);
+            
+            // Verificar el resultado esperado
+            assert!(result_obtener.is_ok(), "Error al obtener los resultados de la elección");
+        }
+
+        #[ink::test]
+        fn test_obtener_resultados_privado_fallo_eleccion_inexistente() {
+            let mut contrato = TrabajoFinal::new();
+            let id_administrador = AccountId::from([1; 32]);
+
+            // Simular un administrador registrado
+            contrato.administrador = id_administrador;
+
+            // Simular una elección 
+            contrato.elecciones.push(Eleccion {
+                id: 1,
+                candidatos: vec![],
+                votantes: vec![],
+                usuarios_rechazados: vec![],
+                usuarios_pendientes: vec![],
+                votacion_iniciada: false,
+                fecha_inicio: 0, 
+                fecha_final: 100, 
+                resultados: None,
+            });
+
+            let result_obtener = contrato.obtener_resultados_privado(10);
+
+            // Verificar el resultado esperado
+            assert!(result_obtener.is_err(), "Se esperaba un error al obtener los resultados de la elección (no se encontró elección)");
+        }
+
+        #[ink::test]
+        fn test_obtener_resultados_privado_fallo_no_finalizo() {
+            // Configuración inicial del contrato y del contexto de prueba
+            let mut contrato = TrabajoFinal::new();
+            let id_administrador = AccountId::from([1; 32]); // Ejemplo de ID de administrador
+
+            // Simular un administrador registrado
+            contrato.administrador = id_administrador;
+
+            // Simular una elección válida sin usuarios pendientes
+            contrato.elecciones.push(Eleccion {
+                id: 1,
+                candidatos: vec![],
+                votantes: vec![],
+                usuarios_rechazados: vec![],
+                usuarios_pendientes: vec![],
+                votacion_iniciada: false,
+                fecha_inicio: 50, // Ajustar según la lógica de tu contrato
+                fecha_final: 100, // Ajustar según la lógica de tu contrato
+                resultados: None,
+            });
+            ink::env::test::advance_block::<ink::env::DefaultEnvironment>();
+            ink::env::test::set_block_timestamp::<ink::env::DefaultEnvironment>(75);
+
+            // Ejecutar el método para obtener el siguiente usuario pendiente en la elección
+            let result_obtener = contrato.obtener_resultados_privado(1);
+
+            // Verificar el resultado esperado
+            assert!(result_obtener.is_err(), "Se esperaba un error al obtener el siguiente usuario pendiente en la elección (la eleccion no finalizo)");
         }
 
         #[ink::test]
