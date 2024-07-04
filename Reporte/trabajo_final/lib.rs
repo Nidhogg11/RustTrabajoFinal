@@ -434,9 +434,10 @@ mod TrabajoFinal {
         #[ink(message)]
         pub fn iniciar_votacion(&mut self, eleccion_id:u64) -> Result<String, String>
         {
-            self.inicir_votacion_privado(eleccion_id)
+            self.iniciar_votacion_privado(eleccion_id)
         }
-        pub fn inicir_votacion_privado(&mut self, eleccion_id:u64) -> Result<String, String>
+
+        pub fn iniciar_votacion_privado(&mut self, eleccion_id:u64) -> Result<String, String>
         {
             if !self.es_administrador() { return Err(ERRORES::NO_ES_ADMINISTRADOR.to_string()); }
             let block_timestamp = self.env().block_timestamp();
@@ -738,7 +739,7 @@ mod TrabajoFinal {
             default_accounts, get_account_balance, recorded_events,
             DefaultAccounts, EmittedEvent
         };
-        use ink::env::{DefaultEnvironment, Environment};
+        use ink::env::DefaultEnvironment;
         
         fn get_default_test_accounts(
         ) -> DefaultAccounts<ink::env::DefaultEnvironment> {
@@ -1326,6 +1327,117 @@ mod TrabajoFinal {
             let result = contrato.procesar_usuarios_en_una_eleccion(2, true);
             assert_eq!(result, Err(String::from("Eleccion no encontrada")));
         } 
+
+
+        #[ink::test]
+        fn test_ingresar_a_eleccion2() {
+            let accounts = get_default_test_accounts();
+            let alice = accounts.alice;
+            let charlie = accounts.charlie;
+            let eleccion_id: u64 = 1;
+            let tipo_usuario: TIPO_DE_USUARIO = TIPO_DE_USUARIO::VOTANTE;
+            set_caller(alice);
+        
+            let mut contract = TrabajoFinal::new();
+        
+            // Establecemos el administrador como el llamante y activamos el registro
+            contract.activar_registro().unwrap();
+            contract.crear_eleccion("01-01-2024 10:00".into(), "02-01-2024 10:00".into()).unwrap();
+        
+            // Usuario no registrado intenta ingresar a la elección
+            set_caller(charlie);
+            let result = contract.ingresar_a_eleccion_privado(eleccion_id, tipo_usuario.clone());
+            assert_eq!(result, Err(ERRORES::USUARIO_NO_REGISTRADO.to_string()), "Error: Usuario no registrado");
+        
+            // Registramos al usuario
+            let result = contract.registrarse("Juan".into(), "Perez".into(), "12345678".into()).unwrap();
+            assert_eq!(result, String::from("Registro exitoso. Se te añadió en la cola de usuarios pendientes."));
+        
+            // Aceptamos al usuario pendiente
+            set_caller(alice);
+            let result = contract.procesar_siguiente_usuario_pendiente(true);
+            assert_eq!(result, Ok(String::from("Usuario agregado exitosamente.")));
+        
+            // Usuario registrado intenta ingresar a la elección
+            set_caller(charlie);
+            let result = contract.ingresar_a_eleccion_privado(eleccion_id, tipo_usuario.clone());
+            assert_eq!(result, Ok(String::from("Ingresó a la elección correctamente Pendiente de aprobacion del Administrador")));
+        
+            
+            // Limpiamos el estado de usuarios rechazados para continuar con el test
+            contract.elecciones[0].usuarios_rechazados.clear();
+            contract.elecciones[0].usuarios_pendientes.clear();
+        
+
+        }
+
+        #[ink::test]
+    fn test_iniciar_votacion_privado() {
+        let accounts = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>();
+
+        // Crear el contrato con el administrador
+        let mut contrato = TrabajoFinal::new();
+
+        // Añadir una elección de prueba
+        contrato.elecciones.push(Eleccion {
+            id: 1,
+            candidatos: vec![],
+            votantes: vec![],
+            usuarios_pendientes: vec![],
+            usuarios_rechazados: vec![],
+            votacion_iniciada: false,
+            fecha_inicio: 50,
+            fecha_final: 150,
+            resultados: None,
+        });
+
+        // Caso 1: No es administrador
+        ink::env::test::set_caller::<ink::env::DefaultEnvironment>(accounts.bob);
+        assert_eq!(
+            contrato.iniciar_votacion_privado(1),
+            Err(String::from("No eres el administrador."))
+        );
+
+        // Caso 2: Elección no encontrada
+        ink::env::test::set_caller::<ink::env::DefaultEnvironment>(accounts.alice); // Restaurar administrador
+        assert_eq!(
+            contrato.iniciar_votacion_privado(2),
+            Err(String::from("No existe una elección con ese id."))
+        );
+
+        // Caso 3: Votación ya finalizó
+        ink::env::test::advance_block::<ink::env::DefaultEnvironment>();
+        ink::env::test::set_block_timestamp::<ink::env::DefaultEnvironment>(200);
+        assert_eq!(
+            contrato.iniciar_votacion_privado(1),
+            Err(String::from("La votación ya finalizó."))
+        );
+
+        // Caso 4: Votación ya inició
+        ink::env::test::set_block_timestamp::<ink::env::DefaultEnvironment>(100); // Restaurar el timestamp del bloque
+        contrato.elecciones[0].votacion_iniciada = true;
+        assert_eq!(
+            contrato.iniciar_votacion_privado(1),
+            Err(String::from("La votación ya inició."))
+        );
+
+        // Caso 5: Todavía no es la fecha para la votación
+        contrato.elecciones[0].votacion_iniciada = false;
+        ink::env::test::set_block_timestamp::<ink::env::DefaultEnvironment>(30); // Cambiar el timestamp del bloque
+        assert_eq!(
+            contrato.iniciar_votacion_privado(1),
+            Err(String::from("Todavía no es la fecha para la votación."))
+        );
+
+        // Caso 6: Se inició la votación exitosamente
+        ink::env::test::set_block_timestamp::<ink::env::DefaultEnvironment>(100); // Restaurar el timestamp del bloque
+        assert_eq!(
+            contrato.iniciar_votacion_privado(1),
+            Ok(String::from("Se inició la votación exitosamente."))
+        );
+        assert!(contrato.elecciones[0].votacion_iniciada);
+    }
+        
         #[ink::test]
         fn test_obtener_candidatos_eleccion_por_id(){
             let administrador: AccountId = AccountId::from([0x1; 32]);
