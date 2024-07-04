@@ -797,6 +797,76 @@ mod TrabajoFinal {
         // ====================== INICIO TESTS ELECCION ======================
         // ====================== INICIO TESTS ELECCION ======================
         #[test]
+        fn test_obtener_resultados_votacion() {
+            let administrador: AccountId = AccountId::from([0x1; 32]);
+            set_caller(administrador);
+
+            let mut contrato = TrabajoFinal::new();
+            set_block_timestamp::<ink::env::DefaultEnvironment>(1675666400000);
+
+            set_contract(administrador);
+
+            let _ = contrato.activar_registro();
+            let _ = contrato.crear_eleccion_privado(
+                "01-01-2023 12:00".to_string(),
+                "31-01-2025 12:00".to_string()
+            );
+            let _ = contrato.crear_eleccion_privado(
+                "01-01-2023 12:00".to_string(),
+                "31-01-2023 12:00".to_string()
+            );
+
+            let eleccion = contrato.obtener_eleccion_por_id(1).unwrap();
+            assert!(eleccion.obtener_resultados_votacion(1675666400000).is_none());
+
+            let eleccion = contrato.obtener_eleccion_por_id(2).unwrap();
+            let resultados = Resultados {votos_totales:0, votos_candidatos:Vec::new(), votos_realizados: 0 };
+            assert_eq!(eleccion.obtener_resultados_votacion(1675666400000), Some(&resultados));
+            assert_eq!(eleccion.obtener_resultados_votacion(1675666400000), Some(&resultados));
+        }
+
+        #[ink::test]
+        fn test_desactivar_registro() {
+            let mut contrato = TrabajoFinal::new();
+            let id_administrador = AccountId::from([1; 32]); // Ejemplo de ID de administrador
+
+            // Simular un administrador registrado
+            contrato.administrador = id_administrador;
+
+            // Establece el llamante como administrador (reemplaza con el AccountId real)
+            set_caller(id_administrador);
+
+            // Llama a la función del contrato que requiere env().caller()
+            let result = contrato.desactivar_registro();
+
+            // Asegúrate de que el resultado sea el esperado
+            assert_eq!(result, Err("El registro ya está desactivado.".to_string()));
+        }
+
+        #[ink::test]
+        fn test_obtener_informacion_usuario(){
+            let generador_reportes = AccountId::from([0; 32]);
+            let administrador = AccountId::from([1; 32]);
+            let user_id = AccountId::from([2; 32]);
+            set_caller(administrador);
+            let mut contrato = TrabajoFinal::new();
+            assert!(contrato.asignar_generador_reportes(generador_reportes).is_ok());
+
+            //Intentar llamar sin ser el generador reporte
+            assert!(contrato.obtener_informacion_usuario(user_id).is_none());
+            set_caller(generador_reportes);
+            //Usuario no existente
+            assert!(contrato.obtener_informacion_usuario(user_id).is_none());
+
+            let user = Usuario { id: (user_id), nombre: ("Joaquin".to_string()), apellido: ("Fontana".to_string()), dni: ("22222".to_string()) };
+            let nombre = user.nombre.clone();
+            let apellido = user.apellido.clone();
+            let dni = user.dni.clone();
+            contrato.usuarios.push(user);
+            assert!(contrato.obtener_informacion_usuario(user_id).is_some_and(|tupla| tupla.0 == nombre && tupla.1 == apellido && tupla.2 == dni));
+        }
+
+        #[test]
         fn test_obtener_votantes_eleccion_por_id_privado() {
             let administrador: AccountId = AccountId::from([0x1; 32]);
             set_caller(administrador);
