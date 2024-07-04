@@ -1004,6 +1004,293 @@ mod TrabajoFinal {
     
             assert!(trabajo_final.obtener_eleccion_por_id(2).is_none());
         }
+
+
+        #[ink::test]
+        fn test_activar_registro() {
+            let mut contract = TrabajoFinal::new();
+
+            let res = contract.activar_registro_privado();
+            assert_eq!(res, Ok(String::from("Se activó el registro para los usuarios.")));
+            assert_eq!(contract.registro_activado, true);
+
+            let res = contract.activar_registro_privado();
+            assert_eq!(res, Err(String::from("El registro ya está activado.")));
+        }
+
+        #[ink::test]
+        fn test_registro_usuario() {
+            let administrador: AccountId = AccountId::from([0x1; 32]);
+            let otro_usuario: AccountId = AccountId::from([0x2; 32]);
+
+            set_caller::<DefaultEnvironment>(administrador);
+            let mut contrato = TrabajoFinal::new();
+
+            contrato.activar_registro_privado().unwrap();
+
+            set_caller::<DefaultEnvironment>(otro_usuario);
+
+            let resultado = contrato.registrarse_privado("John".to_string(), "Doe".to_string(), "12345678".to_string());
+            assert_eq!(resultado, Ok("Registro exitoso. Se te añadió en la cola de usuarios pendientes.".to_string()));
+        }
+
+        #[ink::test]
+        fn test_obtener_ref_eleccion_por_id() {
+            let mut contrato = TrabajoFinal::new();
+
+            let candidato1 = CandidatoConteo {
+                id: AccountId::from([0x01; 32]),
+                candidato_id: 1,
+                votos_totales: 0,
+            };
+            let candidato2 = CandidatoConteo {
+                id: AccountId::from([0x02; 32]),
+                candidato_id: 2,
+                votos_totales: 0,
+            };
+
+            let votante1 = Votante {
+                id: AccountId::from([0x03; 32]),
+                voto_emitido: false,
+            };
+            let votante2 = Votante {
+                id: AccountId::from([0x04; 32]),
+                voto_emitido: false,
+            };
+
+            contrato.elecciones.push(Eleccion {
+                id: 1,
+                candidatos: vec![candidato1],
+                votantes: vec![votante1],
+                usuarios_rechazados: vec![],
+                usuarios_pendientes: vec![],
+                votacion_iniciada: false,
+                fecha_inicio: 0,
+                fecha_final: 0,
+            });
+
+            contrato.elecciones.push(Eleccion {
+                id: 2,
+                candidatos: vec![candidato2],
+                votantes: vec![votante2],
+                usuarios_rechazados: vec![],
+                usuarios_pendientes: vec![],
+                votacion_iniciada: false,
+                fecha_inicio: 0,
+                fecha_final: 0,
+            });
+
+            let resultado = contrato.obtener_ref_eleccion_por_id(1);
+            assert!(resultado.is_some());
+            assert_eq!(resultado.unwrap(), &contrato.elecciones[0]);
+
+            let resultado = contrato.obtener_ref_eleccion_por_id(2);
+            assert!(resultado.is_some());
+            assert_eq!(resultado.unwrap(), &contrato.elecciones[1]);
+
+            let resultado = contrato.obtener_ref_eleccion_por_id(3);
+            assert!(resultado.is_none());
+        }
+
+        #[ink::test]
+        fn test_validar_estado_eleccion() {
+            let mut contrato = TrabajoFinal::new();
+            let usuario_id = AccountId::from([0x01; 32]);
+            
+            contrato.elecciones.push(Eleccion {
+                id: 1,
+                candidatos: vec![],
+                votantes: vec![],
+                usuarios_rechazados: vec![],
+                usuarios_pendientes: vec![(usuario_id, TIPO_DE_USUARIO::VOTANTE)],
+                votacion_iniciada: false,
+                fecha_inicio: 100,
+                fecha_final: 200,
+            });
+
+            contrato.elecciones.push(Eleccion {
+                id: 2,
+                candidatos: vec![],
+                votantes: vec![],
+                usuarios_rechazados: vec![],
+                usuarios_pendientes: vec![],
+                votacion_iniciada: true,
+                fecha_inicio: 100,
+                fecha_final: 200,
+            });
+
+            contrato.elecciones.push(Eleccion {
+                id: 3,
+                candidatos: vec![],
+                votantes: vec![],
+                usuarios_rechazados: vec![],
+                usuarios_pendientes: vec![],
+                votacion_iniciada: false,
+                fecha_inicio: 100,
+                fecha_final: 50,
+            });
+
+            contrato.elecciones.push(Eleccion {
+                id: 4,
+                candidatos: vec![],
+                votantes: vec![],
+                usuarios_rechazados: vec![],
+                usuarios_pendientes: vec![],
+                votacion_iniciada: false,
+                fecha_inicio: 150,
+                fecha_final: 200,
+            });
+
+            // Caso 1: Usuario ya registrado
+            let resultado = contrato.validar_estado_eleccion(1, 50, usuario_id);
+            assert_eq!(resultado, Err(String::from("Ya está registrado en la elección.")));
+
+            // Caso 2: Votación ya comenzó
+            let resultado = contrato.validar_estado_eleccion(2, 50, usuario_id);
+            assert_eq!(resultado, Err(String::from("La votación en la elección ya comenzó, no te puedes registrar.")));
+
+            // Caso 3: Elección ya finalizó
+            let resultado = contrato.validar_estado_eleccion(3, 52, usuario_id);
+            assert_eq!(resultado, Err(String::from("La elección ya finalizó, no te puedes registrar.")));
+
+            // Caso 4: Elección válida y no iniciada
+            let resultado = contrato.validar_estado_eleccion(4, 50, usuario_id);
+            assert!(resultado.is_ok());
+            let eleccion = resultado.unwrap();
+            assert_eq!(eleccion.id, 4);
+        }
+
+        #[ink::test]
+        fn test_crear_eleccion() {
+            // Instanciar el contrato
+            let mut contrato = TrabajoFinal::new();
+    
+            // Configurar el administrador
+            let administrador = AccountId::from([0x1; 32]);
+            contrato.administrador = administrador;
+    
+            // Crear una elección válida
+            let resultado = contrato.crear_eleccion_privado(
+                "01-01-2025 12:00".to_string(),
+                "31-01-2025 12:00".to_string()
+            );
+    
+            // Verificar que la elección se creó correctamente
+            assert_eq!(resultado, Ok("Eleccion creada exitosamente. Id de la elección: 1".to_string()));
+    
+            // Verificar que la elección se añadió a la lista
+            assert_eq!(contrato.elecciones.len(), 1);
+            let eleccion = &contrato.elecciones[0];
+            assert_eq!(eleccion.id, 1);
+            assert_eq!(eleccion.fecha_inicio, 1735732800000); 
+            assert_eq!(eleccion.fecha_final, 1738324800000);
+    
+            // Crear una elección con fecha inicial inválida
+            let resultado = contrato.crear_eleccion_privado(
+                "01-01-2025 12:00".to_string(),
+                "invalid-date".to_string()
+            );
+            assert_eq!(resultado, Err("Error en el formato de la fecha final. Formato: dd-mm-YYYY hh:mm".to_string()));
+    
+            // Crear una elección con fecha final inválida
+            let resultado = contrato.crear_eleccion_privado(
+                "invalid-date".to_string(),
+                "31-01-2025 12:00".to_string()
+            );
+            assert_eq!(resultado, Err("Error en el formato de la fecha inicial. Formato: dd-mm-YYYY hh:mm".to_string()));
+    
+            // Crear una elección sin ser administrador
+            contrato.administrador = AccountId::from([0x2; 32]);
+            let resultado = contrato.crear_eleccion_privado(
+                "01-01-2025 12:00".to_string(),
+                "31-01-2025 12:00".to_string()
+            );
+            assert_eq!(resultado, Err(ERRORES::NO_ES_ADMINISTRADOR.to_string()));
+        }
+
+        #[ink::test]
+        fn test_procesar_usuarios_en_una_eleccion() {
+            let mut contrato = TrabajoFinal::new();
+            let accounts = default_accounts::<DefaultEnvironment>();
+            
+            contrato.crear_eleccion_privado(
+                String::from("01-07-2024 12:00"),
+                String::from("02-07-2024 12:00"),
+            ).unwrap();
+
+            
+            contrato.elecciones[0].usuarios_pendientes.push((accounts.alice, TIPO_DE_USUARIO::VOTANTE));
+            contrato.elecciones[0].usuarios_pendientes.push((accounts.bob, TIPO_DE_USUARIO::CANDIDATO));
+
+    
+            // Caso 1: Procesar siguiente usuario aceptando
+            let result = contrato.procesar_usuarios_en_una_eleccion(1, true);
+            assert_eq!(result, Ok(String::from("Usuario agregado exitosamente.")));
+    
+            // Caso 2: Procesar siguiente usuario aceptando como candidato
+            let result = contrato.procesar_usuarios_en_una_eleccion(1, true);
+            assert_eq!(result, Ok(String::from("Usuario agregado exitosamente.")));
+    
+            // Caso 3: Procesar siguiente usuario rechazando
+            let result = contrato.procesar_usuarios_en_una_eleccion(1, false);
+            assert_eq!(result, Err(String::from("No hay usuarios pendientes.")));
+    
+            // Caso 4: Intentar procesar usuario en una elección no existente
+            let result = contrato.procesar_usuarios_en_una_eleccion(2, true);
+            assert_eq!(result, Err(String::from("Eleccion no encontrada")));
+        } 
+
+
+        #[ink::test]
+        fn test_obtener_informacion_candidato() {
+            // Instancia del contrato
+            let mut contrato = TrabajoFinal::new();
+    
+            // Configurar el administrador
+            let administrador = AccountId::from([0x1; 32]);
+            contrato.administrador = administrador;
+    
+            // Usuario registrado
+            let usuario_registrado = AccountId::from([0x2; 32]);
+            let usuario = crear_usuario(usuario_registrado, "Juan", "Perez", "12345678");
+            let usuario_clonado = usuario.clone();
+            contrato.usuarios.push(usuario);
+            let id=contrato.usuarios[0].id;
+            assert_eq!(id,usuario_registrado);
+
+    
+            // Crear una elección válida
+            let resultado_creacion = contrato.crear_eleccion(
+                "01-01-2025 12:00".to_string(),
+                "31-01-2025 12:00".to_string(),
+            );
+            assert_eq!(
+                resultado_creacion,
+                Ok("Eleccion creada exitosamente. Id de la elección: 1".to_string())
+            );
+            contrato.elecciones[0].usuarios_pendientes.push((usuario_registrado, TIPO_DE_USUARIO::CANDIDATO));
+            let result = contrato.procesar_usuarios_en_una_eleccion(1, true);
+            assert_eq!(result, Ok(String::from("Usuario agregado exitosamente.")));
+
+            
+            // Obtener información del candidato
+            
+            let resultado_info = contrato.obtener_informacion_candidato(1, 1);
+            assert_eq!(resultado_info.unwrap().id, usuario_clonado.id);
+            // Caso: Elección no existente
+            let resultado_info = contrato.obtener_informacion_candidato(2, 1);
+            assert_eq!(
+                resultado_info,
+                Err("No existe una elección con ese id.".to_string())
+            );
+    
+            // Caso: Candidato no existente
+            let resultado_info = contrato.obtener_informacion_candidato(1, 2);
+            assert_eq!(
+                resultado_info,
+                Err("No existe una candidato con ese id.".to_string())
+            );
+        }
     
     }
 

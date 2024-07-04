@@ -3,6 +3,8 @@
 /Reporte/target/
 /Reporte/trabajo_final/target/
 
+
+build_rs_cov.profraw
 # Ignore backup files creates by cargo fmt.
 **/*.rs.bk
 
