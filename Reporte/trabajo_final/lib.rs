@@ -909,7 +909,7 @@ mod TrabajoFinal {
             assert_eq!(result, Err(String::from("No hay usuarios pendientes.")));
         }
         #[test]
-        fn test_obtener_informacion_siguiente_usuario_pendiente_eleccion() {
+        fn test_obtener_informacion_siguiente_usuario_pendiente() {
             let administrador: AccountId = AccountId::from([0x1; 32]);
             let otro_usuario: AccountId = AccountId::from([0x2; 32]);
             set_caller(administrador);
