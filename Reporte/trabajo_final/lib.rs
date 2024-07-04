@@ -1,7 +1,7 @@
 #![cfg_attr(not(feature = "std"), no_std, no_main)]
 
-pub use self::TrabajoFinal::TrabajoFinalRef;
-pub use TrabajoFinal::Votante;
+pub use self::TrabajoFinal::{TrabajoFinal as StructTrabajoFinal, TrabajoFinalRef};
+
 #[ink::contract]
 mod TrabajoFinal {
     use ink::prelude::string::String;
@@ -712,10 +712,24 @@ mod TrabajoFinal {
     #[cfg(test)]
     mod tests {
         use super::*;
-        use ink::env::test::default_accounts;
+        use ink::env::test::{
+            default_accounts, get_account_balance, recorded_events,
+            DefaultAccounts, EmittedEvent
+        };
         use ink::env::DefaultEnvironment;
         
-
+        fn get_default_test_accounts(
+        ) -> DefaultAccounts<ink::env::DefaultEnvironment> {
+            default_accounts::<ink::env::DefaultEnvironment>()
+        }
+    
+        // Sets caller returned by the next `Self::env().caller()` method call
+        // in the contract.
+        fn set_caller(caller: AccountId) {
+            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(caller);
+        }
+    
+            // test errores
         #[test]
         fn test_no_es_administrador() {
             let error = ERRORES::NO_ES_ADMINISTRADOR;
@@ -727,8 +741,8 @@ mod TrabajoFinal {
             let error = ERRORES::USUARIO_NO_REGISTRADO;
             assert_eq!(error.to_string(), "No estás registrado en el sistema. Espera a que te acepten en el mismo o realiza la solicitud.");
         }
-
-
+            // test errores
+    
     
         fn setup_eleccion() -> Eleccion {
             Eleccion {
@@ -744,10 +758,14 @@ mod TrabajoFinal {
             }
         }
     
+    
+        // ====================== INICIO TESTS ELECCION ======================
+        // ====================== INICIO TESTS ELECCION ======================
+        // ====================== INICIO TESTS ELECCION ======================
         #[test]
         fn test_contiene_usuario_pendiente() {
             let mut eleccion = setup_eleccion();
-            let accounts = default_accounts::<DefaultEnvironment>();//uentas predeterminadas utilizadas para tests
+            let accounts = get_default_test_accounts();//uentas predeterminadas utilizadas para tests
             
             eleccion.usuarios_pendientes.push((accounts.alice, TIPO_DE_USUARIO::VOTANTE));
             
@@ -758,7 +776,7 @@ mod TrabajoFinal {
         #[test]
         fn test_existe_candidato() {
             let mut eleccion = setup_eleccion();
-            let accounts = default_accounts::<DefaultEnvironment>();
+            let accounts = get_default_test_accounts();
             
             eleccion.candidatos.push(CandidatoConteo {
                 id: accounts.alice,
@@ -773,7 +791,7 @@ mod TrabajoFinal {
         #[test]
         fn test_votar_candidato() {
             let mut eleccion = setup_eleccion();
-            let accounts = default_accounts::<DefaultEnvironment>();
+            let accounts = get_default_test_accounts();
     
             eleccion.candidatos.push(CandidatoConteo {
                 id: accounts.alice,
@@ -795,7 +813,7 @@ mod TrabajoFinal {
         #[test]
         fn test_procesar_siguiente_usuario_pendiente() {
             let mut eleccion = setup_eleccion();
-            let accounts = default_accounts::<DefaultEnvironment>();
+            let accounts = get_default_test_accounts();
     
             eleccion.usuarios_pendientes.push((accounts.alice, TIPO_DE_USUARIO::VOTANTE));
             eleccion.usuarios_pendientes.push((accounts.bob, TIPO_DE_USUARIO::CANDIDATO));
@@ -813,11 +831,11 @@ mod TrabajoFinal {
             let result = eleccion.procesar_siguiente_usuario_pendiente(false);
             assert_eq!(result, Err(String::from("No hay usuarios pendientes.")));
         }
-
+    
         #[test]
         fn test_obtener_informacion_candidato() {
             let mut eleccion = setup_eleccion();
-            let accounts = default_accounts::<DefaultEnvironment>();
+            let accounts = get_default_test_accounts();
             eleccion.candidatos.push(CandidatoConteo {
                 id: accounts.alice,
                 candidato_id: 1,
@@ -828,11 +846,11 @@ mod TrabajoFinal {
                 candidato_id: 2,
                 votos_totales: 0,
             });
-
+    
             let candidato_info = eleccion.obtener_informacion_candidato(1);
             assert!(candidato_info.is_some());
             assert_eq!(candidato_info.unwrap().id, accounts.alice);
-
+    
             let candidato_info = eleccion.obtener_informacion_candidato(2);
             assert!(candidato_info.is_some());
             assert_eq!(candidato_info.unwrap().id, accounts.bob);
@@ -841,96 +859,139 @@ mod TrabajoFinal {
             assert!(candidato_info.is_none());
         }
         
-
-
-    fn crear_usuario(id: AccountId, nombre: &str, apellido: &str, dni: &str) -> Usuario {
-        Usuario {
-            id,
-            nombre: nombre.to_string(),
-            apellido: apellido.to_string(),
-            dni: dni.to_string(),
+        // ====================== FIN TESTS ELECCION ======================
+        // ====================== FIN TESTS ELECCION ======================
+        // ====================== FIN TESTS ELECCION ======================
+    
+    
+        
+        fn crear_usuario(id: AccountId, nombre: &str, apellido: &str, dni: &str) -> Usuario {
+            Usuario {
+                id,
+                nombre: nombre.to_string(),
+                apellido: apellido.to_string(),
+                dni: dni.to_string(),
+            }
         }
-    }
-    fn crear_trabajo_final(administrador: AccountId) -> TrabajoFinal {
-        TrabajoFinal {
-            administrador,
-            generador_reportes: None,
-            registro_activado: false,
-            usuarios: Vec::new(),
-            usuarios_pendientes: Vec::new(),
-            usuarios_rechazados: Vec::new(),
-            elecciones: Vec::new(),
+        fn crear_trabajo_final(administrador: AccountId) -> TrabajoFinal {
+            TrabajoFinal {
+                administrador,
+                generador_reportes: None,
+                registro_activado: false,
+                usuarios: Vec::new(),
+                usuarios_pendientes: Vec::new(),
+                usuarios_rechazados: Vec::new(),
+                elecciones: Vec::new(),
+            }
         }
+        
+        // ====================== INICIO TESTS SISTEMA ELECCIONES ======================
+        // ====================== INICIO TESTS SISTEMA ELECCIONES ======================
+        // ====================== INICIO TESTS SISTEMA ELECCIONES ======================
+    
+        #[test]
+        fn test_constructor() {
+            let accounts = get_default_test_accounts();
+            let alice = accounts.alice;
+            let charlie = accounts.charlie;
+            set_caller(alice);
+    
+            let sistema_elecciones = TrabajoFinal::new();
+            assert_eq!(sistema_elecciones.registro_activado, false);
+            assert_eq!(sistema_elecciones.administrador, alice);
+            assert_ne!(sistema_elecciones.administrador, charlie);
+        }
+    
+        #[test]
+        fn test_constructor_transferir_administrador() {
+            let accounts = get_default_test_accounts();
+            let alice = accounts.alice;
+            let charlie = accounts.charlie;
+            let bob = accounts.bob;
+            set_caller(alice);
+    
+            let mut sistema_elecciones = TrabajoFinal::new();
+    
+            let result = sistema_elecciones.transferir_administrador_privado(charlie);
+            assert!(result.is_ok());
+            assert_ne!(sistema_elecciones.administrador, alice);
+            assert_eq!(sistema_elecciones.administrador, charlie);
+    
+            set_caller(bob);
+            let result = sistema_elecciones.transferir_administrador_privado(charlie);
+            assert!(result.is_err());
+            assert_ne!(sistema_elecciones.administrador, alice);
+            assert_eq!(sistema_elecciones.administrador, charlie);
+        }
+    
+        #[ink::test]
+        fn test_obtener_usuario() {
+            let accounts = get_default_test_accounts();
+            let id: AccountId = accounts.alice;
+            let mut trabajo_final = TrabajoFinal::new();
+            let usuario = crear_usuario(id, "Juan", "Perez", "12345678");
+            trabajo_final.usuarios.push(usuario);
+    
+            let result = trabajo_final.obtener_usuario(id);
+            assert!(result.is_some());
+            let user = result.unwrap();
+            assert_eq!(user.nombre, "Juan");
+            assert_eq!(user.apellido, "Perez");
+            assert_eq!(user.dni, "12345678");
+        }
+    
+        #[ink::test]
+        fn test_es_usuario_registrado() {
+            let accounts = get_default_test_accounts();
+            let id: AccountId = accounts.alice;
+            let mut trabajo_final = TrabajoFinal::new();
+            let usuario = crear_usuario(id, "Juan", "Perez", "12345678");
+            trabajo_final.usuarios.push(usuario);
+    
+            assert!(trabajo_final.es_usuario_registrado());
+        }
+    
+        #[ink::test]
+        fn test_es_usuario_pendiente() {
+            let accounts = get_default_test_accounts();
+            let id: AccountId = accounts.alice;
+            let mut trabajo_final = TrabajoFinal::new();
+            let usuario = crear_usuario(id, "Juan", "Perez", "12345678");
+            trabajo_final.usuarios_pendientes.push(usuario);
+    
+            assert!(trabajo_final.es_usuario_pendiente());
+        }
+    
+        #[test]
+        fn test_existe_eleccion() {
+            let id: AccountId = [0; 32].into();
+            let mut trabajo_final = crear_trabajo_final(id);
+            let eleccion = setup_eleccion();
+            trabajo_final.elecciones.push(eleccion);
+    
+            assert!(trabajo_final.existe_eleccion(1));
+            assert!(!trabajo_final.existe_eleccion(2));
+        }
+    
+        #[test]
+        fn test_obtener_eleccion_por_id() {
+            let id: AccountId = [0; 32].into();
+            let mut trabajo_final = crear_trabajo_final(id);
+            let eleccion = setup_eleccion();
+            trabajo_final.elecciones.push(eleccion);
+    
+            let result = trabajo_final.obtener_eleccion_por_id(1);
+            assert!(result.is_some());
+            let eleccion_obtenida = result.unwrap();
+            assert_eq!(eleccion_obtenida.id, 1);
+    
+            assert!(trabajo_final.obtener_eleccion_por_id(2).is_none());
+        }
+    
     }
 
-    #[ink::test]
-    fn test_obtener_usuario() {
-        let accounts = default_accounts::<DefaultEnvironment>();
-        let id: AccountId = accounts.alice;
-        let mut trabajo_final = TrabajoFinal::new();
-        let usuario = crear_usuario(id, "Juan", "Perez", "12345678");
-        trabajo_final.usuarios.push(usuario);
+}    
 
-        let result = trabajo_final.obtener_usuario(id);
-        assert!(result.is_some());
-        let user = result.unwrap();
-        assert_eq!(user.nombre, "Juan");
-        assert_eq!(user.apellido, "Perez");
-        assert_eq!(user.dni, "12345678");
-    }
-
-    #[ink::test]
-    fn test_es_usuario_registrado() {
-        let accounts = default_accounts::<DefaultEnvironment>();
-        let id: AccountId = accounts.alice;
-        let mut trabajo_final = TrabajoFinal::new();
-        let usuario = crear_usuario(id, "Juan", "Perez", "12345678");
-        trabajo_final.usuarios.push(usuario);
-
-        assert!(trabajo_final.es_usuario_registrado());
-    }
-
-    #[ink::test]
-    fn test_es_usuario_pendiente() {
-        let accounts = default_accounts::<DefaultEnvironment>();
-        let id: AccountId = accounts.alice;
-        let mut trabajo_final = TrabajoFinal::new();
-        let usuario = crear_usuario(id, "Juan", "Perez", "12345678");
-        trabajo_final.usuarios_pendientes.push(usuario);
-
-        assert!(trabajo_final.es_usuario_pendiente());
-    }
-
-    #[test]
-    fn test_existe_eleccion() {
-        let id: AccountId = [0; 32].into();
-        let mut trabajo_final = crear_trabajo_final(id);
-        let eleccion = setup_eleccion();
-        trabajo_final.elecciones.push(eleccion);
-
-        assert!(trabajo_final.existe_eleccion(1));
-        assert!(!trabajo_final.existe_eleccion(2));
-    }
-
-    #[test]
-    fn test_obtener_eleccion_por_id() {
-        let id: AccountId = [0; 32].into();
-        let mut trabajo_final = crear_trabajo_final(id);
-        let eleccion = setup_eleccion();
-        trabajo_final.elecciones.push(eleccion);
-
-        let result = trabajo_final.obtener_eleccion_por_id(1);
-        assert!(result.is_some());
-        let eleccion_obtenida = result.unwrap();
-        assert_eq!(eleccion_obtenida.id, 1);
-
-        assert!(trabajo_final.obtener_eleccion_por_id(2).is_none());
-    }
-
-    }
-
-   
-}
 
 
 

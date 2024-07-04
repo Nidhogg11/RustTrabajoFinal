@@ -3,7 +3,6 @@
 #[ink::contract]
 mod Reporte {
     use core::ops::Mul;
-
     use ink::prelude::vec::Vec;
     use TrabajoFinal::TrabajoFinalRef;
     use scale_info::prelude::string::String;
@@ -80,5 +79,86 @@ mod Reporte {
 
              Ok(( candidatos[0].clone(), candidatos ))
         }
+    }
+
+
+    #[cfg(test)]
+    // #[cfg(all(test, feature = "tests"))]
+    mod tests {
+        use super::*;
+        use ink::env::test::{
+            default_accounts, get_account_balance, recorded_events,
+            DefaultAccounts, EmittedEvent
+        };
+        use ink::env::DefaultEnvironment;
+
+        use TrabajoFinal::StructTrabajoFinal;
+    
+        // Returns accounts that are pre-seeded in the test database.
+        // We can use them as authors for transactions.
+        fn get_default_test_accounts(
+        ) -> DefaultAccounts<ink::env::DefaultEnvironment> {
+            default_accounts::<ink::env::DefaultEnvironment>()
+        }
+
+        // Sets caller returned by the next `Self::env().caller()` method call
+        // in the contract.
+        fn set_caller(caller: AccountId) {
+            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(caller);
+        }
+
+        fn setup_sistema_elecciones_vacio() -> StructTrabajoFinal {
+            let accounts = get_default_test_accounts();
+            let alice = accounts.alice;
+            let charlie = accounts.charlie;
+            set_caller(alice);
+
+            StructTrabajoFinal::new()
+        }
+    
+        // #[test]
+        // fn constructor_works() {
+        //     let sistema_elecciones = StructTrabajoFinal::new();
+        //     assert_eq!(sistema_elecciones.\, 0);
+        // }
+
+        // #[test]
+        // fn test_es_generador_reportes() {
+        //     let mut sistema_elecciones = setup_sistema_elecciones_vacio();
+        //     let error = "No es el generador de reportes!";
+        //     assert_ne!(error.to_string(), "No es el generador de reportes!");
+        // }
+    
+        // #[test]
+        // fn test_no_es_generador_reportes() {
+        //     let error = "No es el generador de reportes!";
+        //     assert_eq!(error.to_string(), "No es el generador de reportes!");
+        // }
+
+        // #[test]
+        // fn test_contiene_usuario_pendiente() {
+        //     let mut eleccion = setup_eleccion();
+        //     let accounts = default_accounts::<DefaultEnvironment>();//uentas predeterminadas utilizadas para tests
+            
+        //     eleccion.usuarios_pendientes.push((accounts.alice, TIPO_DE_USUARIO::VOTANTE));
+            
+        //     assert!(eleccion.contiene_usuario_pendiente(accounts.alice));
+        //     assert!(!eleccion.contiene_usuario_pendiente(accounts.bob));
+        // }
+    
+        // #[test]
+        // fn test_existe_candidato() {
+        //     let mut eleccion = setup_eleccion();
+        //     let accounts = default_accounts::<DefaultEnvironment>();
+            
+        //     eleccion.candidatos.push(CandidatoConteo {
+        //         id: accounts.alice,
+        //         candidato_id: 1,
+        //         votos_totales: 0,
+        //     });
+    
+        //     assert!(eleccion.existe_candidato(1));
+        //     assert!(!eleccion.existe_candidato(2));
+        // }
     }
 }
