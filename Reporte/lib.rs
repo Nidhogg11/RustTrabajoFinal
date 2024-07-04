@@ -24,6 +24,9 @@ mod Reporte {
         // una determinada elección.
         #[ink(message)]
         pub fn reporte_de_votantes_por_eleccion(&mut self, id_eleccion: u64) -> Result< Vec<(AccountId, String, String, String)>, String > {
+            self.reporte_de_votantes_por_eleccion_privado(id_eleccion)
+        }
+        pub fn reporte_de_votantes_por_eleccion_privado(&mut self, id_eleccion: u64) -> Result< Vec<(AccountId, String, String, String)>, String > {
             let datos_votantes = match self.trabajo_final.obtener_votantes_eleccion_por_id(id_eleccion) {
                Err(msg) => return Err(msg),
                Ok(datos) => datos 
@@ -44,6 +47,9 @@ mod Reporte {
         // participación, una vez cerrada la elección.
         #[ink(message)]
         pub fn reporte_de_participacion_por_eleccion(&mut self, id_eleccion: u64) -> Result<(u32, u32), String> {
+            self.reporte_de_participacion_por_eleccion_privado(id_eleccion)
+        }
+        pub fn reporte_de_participacion_por_eleccion_privado(&mut self, id_eleccion: u64) -> Result<(u32, u32), String> {
             let datos_votantes = match self.trabajo_final.obtener_votantes_eleccion_por_id(id_eleccion) {
                 Err(msg) => return Err(msg),
                 Ok(datos) => datos 
@@ -61,6 +67,9 @@ mod Reporte {
         // elección.
         #[ink(message)]
         pub fn reporte_de_resultado_por_eleccion(&mut self, id_eleccion: u64) -> Result< ((AccountId, String, String, String, u32), Vec<(AccountId, String, String, String, u32)>), String> {
+            self.reporte_de_resultado_por_eleccion_privado(id_eleccion)
+        }
+        pub fn reporte_de_resultado_por_eleccion_privado(&mut self, id_eleccion: u64) -> Result< ((AccountId, String, String, String, u32), Vec<(AccountId, String, String, String, u32)>), String> {
             let mut datos_candidatos = match self.trabajo_final.obtener_candidatos_eleccion_por_id(id_eleccion) {
                 Err(msg) => return Err(msg),
                 Ok(datos) => datos 

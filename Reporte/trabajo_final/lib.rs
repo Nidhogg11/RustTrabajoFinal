@@ -642,7 +642,12 @@ mod TrabajoFinal {
         // ====-----==== METODOS PARA QUE USE EL OTRO CONTRATO ====----====
 
         #[ink(message)]
-        pub fn obtener_informacion_usuario(&self, user_id: AccountId) -> Option<(String, String, String)> {
+        pub fn obtener_informacion_usuario(&self, user_id: AccountId) -> Option<(String, String, String)> 
+        {
+            self.obtener_informacion_usuario_privado(eleccion_id)
+        }
+        pub fn obtener_informacion_usuario_privado(&self, user_id: AccountId) -> Option<(String, String, String)> 
+        {
             if !self.es_generador_reportes() { return None; }
 
             let option_usuario = self.usuarios.iter().find(|usuario| usuario.id == user_id);
@@ -654,6 +659,10 @@ mod TrabajoFinal {
 
         #[ink(message)]
         pub fn obtener_votantes_eleccion_por_id(&mut self, eleccion_id: u64) -> Result<Vec<(AccountId,bool)>, String>
+        {
+            self.obtener_votantes_eleccion_por_id_privado(eleccion_id)
+        }
+        pub fn obtener_votantes_eleccion_por_id_privado(&mut self, eleccion_id: u64) -> Result<Vec<(AccountId,bool)>, String>
         {
             if !self.es_generador_reportes() { return Err(String::from("No es el generador de reportes!")); }
             let block_timestamp = self.env().block_timestamp();
@@ -674,6 +683,10 @@ mod TrabajoFinal {
         #[ink(message)]
         pub fn obtener_candidatos_eleccion_por_id(&mut self, eleccion_id: u64) -> Result<Vec<(AccountId,u32)>, String>
         {
+            self.obtener_candidatos_eleccion_por_id_privado(eleccion_id)
+        }
+        pub fn obtener_candidatos_eleccion_por_id_privado(&mut self, eleccion_id: u64) -> Result<Vec<(AccountId,u32)>, String>
+        {
             if !self.es_generador_reportes() { return Err(String::from("No es el generador de reportes!")); }
             let block_timestamp = self.env().block_timestamp();
 
@@ -692,16 +705,19 @@ mod TrabajoFinal {
         }
 
         #[ink(message)]
-        pub fn obtener_resultados(&mut self,eleccion_id: u64) -> Option<Resultados> {
+        pub fn obtener_resultados(&mut self,eleccion_id: u64) -> Result<Resultados, String> {
+            self.obtener_resultados_privado(eleccion_id)
+        }
+        pub fn obtener_resultados_privado(&mut self, eleccion_id:u64) -> Result<Resultados, String> {
             let block_timestamp= self.env().block_timestamp();
             let eleccion = match self.obtener_eleccion_por_id(eleccion_id){
                 Some(eleccion) => eleccion,
-                None => return None
+                None => return Err(String::from("No se encontró una elección con ese id."))
             };
-
+    
             match eleccion.obtener_resultados_votacion(block_timestamp) {
-                None => None,
-                Some(resultados) => Some(resultados.clone())
+                None => Err(String::from("Todavía no están los resultados de la elección publicados.")),
+                Some(resultados) => Ok(resultados.clone())
             }
         }
     }
