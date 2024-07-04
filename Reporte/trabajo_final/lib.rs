@@ -732,7 +732,7 @@ mod TrabajoFinal {
     mod tests {
         use super::*;
         use ink::env::test::{
-            default_accounts, get_account_balance, recorded_events,
+            default_accounts, get_account_balance, recorded_events, set_block_timestamp,
             DefaultAccounts, EmittedEvent
         };
         use ink::env::DefaultEnvironment;
@@ -746,6 +746,10 @@ mod TrabajoFinal {
         // in the contract.
         fn set_caller(caller: AccountId) {
             ink::env::test::set_caller::<ink::env::DefaultEnvironment>(caller);
+        }
+
+        fn set_contract(caller: AccountId) {
+            ink::env::test::set_contract::<ink::env::DefaultEnvironment>(caller);
         }
     
             // test errores
@@ -789,9 +793,42 @@ mod TrabajoFinal {
         // ====================== INICIO TESTS ELECCION ======================
         // ====================== INICIO TESTS ELECCION ======================
         #[test]
+        fn test_obtener_votantes_eleccion_por_id_privado() {
+            let administrador: AccountId = AccountId::from([0x1; 32]);
+            set_caller(administrador);
+
+            let mut contrato = TrabajoFinal::new();
+            set_block_timestamp::<ink::env::DefaultEnvironment>(1675666400000);
+
+            set_contract(administrador);
+            
+            assert!(contrato.obtener_votantes_eleccion_por_id_privado(1).is_err());
+
+            let _ = contrato.activar_registro();
+            let _ = contrato.crear_eleccion_privado(
+                "01-01-2023 12:00".to_string(),
+                "31-01-2025 12:00".to_string()
+            );
+            let _ = contrato.crear_eleccion_privado(
+                "01-01-2023 12:00".to_string(),
+                "31-01-2023 12:00".to_string()
+            );
+
+            assert!(contrato.obtener_votantes_eleccion_por_id_privado(1).is_err());
+            let _ = contrato.asignar_generador_reportes_privado(administrador);
+            assert!(contrato.obtener_votantes_eleccion_por_id_privado(1).is_err());
+            
+            let err = contrato.obtener_votantes_eleccion_por_id_privado(2);
+            assert!(err.is_ok());
+
+            let err = contrato.obtener_votantes_eleccion_por_id_privado(3);
+            assert!(err.is_err());
+        }
+
+        #[test]
         fn test_contiene_usuario_pendiente() {
             let mut eleccion = setup_eleccion();
-            let accounts = get_default_test_accounts();//uentas predeterminadas utilizadas para tests
+            let accounts: DefaultAccounts<DefaultEnvironment> = get_default_test_accounts();//uentas predeterminadas utilizadas para tests
             
             eleccion.usuarios_pendientes.push((accounts.alice, TIPO_DE_USUARIO::VOTANTE));
             
