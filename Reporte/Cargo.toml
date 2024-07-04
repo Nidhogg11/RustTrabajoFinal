@@ -11,6 +11,7 @@ scale = { package = "parity-scale-codec", version = "3", default-features = fals
 scale-info = { version = "2.3", default-features = false, features = ["derive"] }
 TrabajoFinal = { path = "trabajo_final", default-features = false, features = ["ink-as-dependency"] }
 
+
 [dev-dependencies]
 ink_e2e = { version = "5.0.0" }
 
