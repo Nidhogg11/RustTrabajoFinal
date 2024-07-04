@@ -6,7 +6,6 @@ mod Reporte {
 
     use ink::prelude::vec::Vec;
     use TrabajoFinal::TrabajoFinalRef;
-    use TrabajoFinal::Votante;
     use scale_info::prelude::string::String;
     
     #[ink(storage)]

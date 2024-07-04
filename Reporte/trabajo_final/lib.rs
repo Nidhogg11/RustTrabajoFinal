@@ -6,7 +6,6 @@ pub use TrabajoFinal::Votante;
 mod TrabajoFinal {
     use ink::prelude::string::String;
     use ink::prelude::vec::Vec;
-    use ink::storage::Mapping;
     use scale_info::prelude::format;
     use ink::prelude::string::ToString;
 
@@ -45,6 +44,7 @@ mod TrabajoFinal {
         apellido:String,
         dni:String,
     }
+
     #[derive(scale::Decode, scale::Encode, Debug,Clone)]
     #[cfg_attr(feature = "std", derive(scale_info::TypeInfo, ink::storage::traits::StorageLayout))]
     pub struct Votante
@@ -52,11 +52,7 @@ mod TrabajoFinal {
         id:AccountId,
         voto_emitido:bool,
     }
-    impl Votante{
-        pub fn get_voto(&self) -> bool{
-            self.voto_emitido
-        }
-    }
+
     #[derive(scale::Decode, scale::Encode, Debug,Clone)]
     #[cfg_attr(feature = "std", derive(scale_info::TypeInfo, ink::storage::traits::StorageLayout))]
     struct CandidatoConteo
@@ -78,7 +74,16 @@ mod TrabajoFinal {
         votacion_iniciada:bool,
         fecha_inicio:u64,
         fecha_final:u64,
-        pub resultados:Option<(CandidatoConteo,CandidatoConteo,CandidatoConteo,Vec<CandidatoConteo>)>
+        resultados:Option<Resultados>
+    }
+
+    #[derive(scale::Decode, scale::Encode, Debug, Clone)]
+    #[cfg_attr(feature = "std", derive(scale_info::TypeInfo, ink::storage::traits::StorageLayout))]
+    pub struct Resultados
+    {
+        votos_totales:u64, // Votos totales, cuentan los que votaron y no votaron
+        votos_realizados:u64, // Votos realizados, cuentan solo los que votaron
+        votos_candidatos:Vec<(AccountId, u64)>
     }
 
     impl Eleccion
@@ -165,6 +170,32 @@ mod TrabajoFinal {
                 self.usuarios_rechazados.push(usuario);
                 return Ok(String::from("Usuario rechazado exitosamente."));
             }
+        }
+
+        fn obtener_resultados_votacion(&mut self, block_timestamp:u64) -> Option<&Resultados>
+        {
+            if self.fecha_final > block_timestamp {
+                return None;
+            }
+
+            if self.resultados.is_some() {
+                return self.resultados.as_ref();
+            }
+
+            let mut resultados = Resultados { 
+                votos_totales: 0, 
+                votos_realizados: 0,
+                votos_candidatos: Vec::new(),
+            };
+
+            resultados.votos_totales = self.votantes.len() as u64;
+            resultados.votos_realizados = self.votantes.iter().filter(|v| v.voto_emitido).count() as u64;
+            self.candidatos.iter().for_each(|c| {
+                resultados.votos_candidatos.push((c.id, c.votos_totales as u64));
+            });
+
+            self.resultados = Some(resultados);
+            return self.resultados.as_ref();
         }
     }
 
@@ -270,33 +301,6 @@ mod TrabajoFinal {
             Ok(eleccion)
         }
 
-        fn calcular_resultados_eleccion(&mut self,eleccion_id: u64,block_timestamp:u64) -> Result<String,String>{
-            let eleccion = match self.obtener_eleccion_por_id(eleccion_id){
-                Some(eleccion) => eleccion,
-                None => return Err("No existe la eleccion!".to_string())
-            };
-            // Verificar si los resultados ya fueron publicados
-            if let Some(_) = eleccion.resultados {
-                return Err("Los resultados ya fueron publicados".to_string());
-            }   
-            //Verificar que la votacion ya haya terminado
-            if eleccion.fecha_final > block_timestamp{
-                return Err("La votacion aun no finalizo!".to_string());
-            }
-            let mut candidatos:Vec<CandidatoConteo> = eleccion.candidatos.clone();
-            candidatos.sort_by(|a,b| b.votos_totales.cmp(&a.votos_totales));
-            
-            // Asegurarse de que hay al menos 3 candidatos
-            if candidatos.len() < 3 {
-                return Err("No hay suficientes candidatos en la eleccion!".to_string());
-            }
-            let primer_puesto = candidatos[0].clone();
-            let segundo_puesto = candidatos[1].clone();
-            let tercer_puesto = candidatos[2].clone();
-            let resultado = (primer_puesto,segundo_puesto,tercer_puesto,candidatos);
-            eleccion.resultados = Some(resultado);
-            return Ok("Los resultados fueron publicados exitosamente".to_string());
-        }
         //  ----- Inicio Metodos publicos -------
         //  ----- Inicio Metodos publicos -------
         //  ----- Inicio Metodos publicos -------
@@ -686,12 +690,19 @@ mod TrabajoFinal {
                 None => Err(String::from("La eleccion enviada no existe!")),
             }
         }
-        pub fn publicar_resultados(&mut self,eleccion_id: u64) -> Result<String,String>{
-            let timestamp= self.env().block_timestamp();
-            match self.calcular_resultados_eleccion(eleccion_id,timestamp){
-                Ok(mensaje_exitoso) => return Ok(mensaje_exitoso),
-                Err(mensaje_error) => return Err(mensaje_error)
+
+        #[ink(message)]
+        pub fn obtener_resultados(&mut self,eleccion_id: u64) -> Option<Resultados> {
+            let block_timestamp= self.env().block_timestamp();
+            let eleccion = match self.obtener_eleccion_por_id(eleccion_id){
+                Some(eleccion) => eleccion,
+                None => return None
             };
+
+            match eleccion.obtener_resultados_votacion(block_timestamp) {
+                None => None,
+                Some(resultados) => Some(resultados.clone())
+            }
         }
     }
    
