@@ -908,7 +908,27 @@ mod TrabajoFinal {
             let result = eleccion.procesar_siguiente_usuario_pendiente(false);
             assert_eq!(result, Err(String::from("No hay usuarios pendientes.")));
         }
-        
+        #[test]
+        fn test_obtener_informacion_siguiente_usuario_pendiente_eleccion() {
+            let administrador: AccountId = AccountId::from([0x1; 32]);
+            let otro_usuario: AccountId = AccountId::from([0x2; 32]);
+            set_caller(administrador);
+
+            let mut contrato = TrabajoFinal::new();
+            
+            let usuario = Usuario { id: (otro_usuario), nombre: ("Joaquin".to_string()), apellido: ("Fontana".to_string()), dni: ("22222222".to_string()) };
+            let mut str = String::from("Nombre: ") + usuario.nombre.as_str();
+            str.push_str((String::from("\nApellido: ") + usuario.apellido.as_str()).as_str());
+            str.push_str((String::from("\nDNI: ") + usuario.apellido.as_str()).as_str());
+            //Intentar obtener informacion sin usuarios pendientes
+            let result = contrato.obtener_informacion_siguiente_usuario_pendiente();
+            assert!(result.is_err());
+            
+            contrato.usuarios_pendientes.push(usuario);
+
+            let result = contrato.obtener_informacion_siguiente_usuario_pendiente();
+            assert!(result.is_ok_and(|info| info == str));
+        }
         
         // ====================== FIN TESTS ELECCION ======================
         // ====================== FIN TESTS ELECCION ======================
@@ -1305,7 +1325,6 @@ mod TrabajoFinal {
             let result = contrato.procesar_usuarios_en_una_eleccion(2, true);
             assert_eq!(result, Err(String::from("Eleccion no encontrada")));
         } 
-
         
         
     }
