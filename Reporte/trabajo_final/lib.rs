@@ -1331,7 +1331,7 @@ mod TrabajoFinal {
 
 
         #[ink::test]
-        fn test_ingresar_a_eleccion2() {
+        fn test_ingresar_a_eleccion() {
             let accounts = get_default_test_accounts();
             let alice = accounts.alice;
             let charlie = accounts.charlie;
@@ -1372,73 +1372,200 @@ mod TrabajoFinal {
 
         }
 
+            #[ink::test]
+        fn test_iniciar_votacion_privado() {
+            let accounts = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>();
+
+            // Crear el contrato con el administrador
+            let mut contrato = TrabajoFinal::new();
+
+            // Añadir una elección de prueba
+            contrato.elecciones.push(Eleccion {
+                id: 1,
+                candidatos: vec![],
+                votantes: vec![],
+                usuarios_pendientes: vec![],
+                usuarios_rechazados: vec![],
+                votacion_iniciada: false,
+                fecha_inicio: 50,
+                fecha_final: 150,
+                resultados: None,
+            });
+
+            // Caso 1: No es administrador
+            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(accounts.bob);
+            assert_eq!(
+                contrato.iniciar_votacion_privado(1),
+                Err(String::from("No eres el administrador."))
+            );
+
+            // Caso 2: Elección no encontrada
+            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(accounts.alice); // Restaurar administrador
+            assert_eq!(
+                contrato.iniciar_votacion_privado(2),
+                Err(String::from("No existe una elección con ese id."))
+            );
+
+            // Caso 3: Votación ya finalizó
+            ink::env::test::advance_block::<ink::env::DefaultEnvironment>();
+            ink::env::test::set_block_timestamp::<ink::env::DefaultEnvironment>(200);
+            assert_eq!(
+                contrato.iniciar_votacion_privado(1),
+                Err(String::from("La votación ya finalizó."))
+            );
+
+            // Caso 4: Votación ya inició
+            ink::env::test::set_block_timestamp::<ink::env::DefaultEnvironment>(100); // Restaurar el timestamp del bloque
+            contrato.elecciones[0].votacion_iniciada = true;
+            assert_eq!(
+                contrato.iniciar_votacion_privado(1),
+                Err(String::from("La votación ya inició."))
+            );
+
+            // Caso 5: Todavía no es la fecha para la votación
+            contrato.elecciones[0].votacion_iniciada = false;
+            ink::env::test::set_block_timestamp::<ink::env::DefaultEnvironment>(30); // Cambiar el timestamp del bloque
+            assert_eq!(
+                contrato.iniciar_votacion_privado(1),
+                Err(String::from("Todavía no es la fecha para la votación."))
+            );
+
+            // Caso 6: Se inició la votación exitosamente
+            ink::env::test::set_block_timestamp::<ink::env::DefaultEnvironment>(100); // Restaurar el timestamp del bloque
+            assert_eq!(
+                contrato.iniciar_votacion_privado(1),
+                Ok(String::from("Se inició la votación exitosamente."))
+            );
+            assert!(contrato.elecciones[0].votacion_iniciada);
+        }
         #[ink::test]
-    fn test_iniciar_votacion_privado() {
-        let accounts = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>();
+        fn test_obtener_siguiente_usuario_pendiente_en_una_eleccion_privado_exito_VOTANTE() {
+            let mut contrato = TrabajoFinal::new();
+            let id_administrador = AccountId::from([1; 32]); 
+            let id_usuario = AccountId::from([2; 32]);
 
-        // Crear el contrato con el administrador
-        let mut contrato = TrabajoFinal::new();
+            // Simular un administrador registrado
+            contrato.administrador = id_administrador;
 
-        // Añadir una elección de prueba
-        contrato.elecciones.push(Eleccion {
-            id: 1,
-            candidatos: vec![],
-            votantes: vec![],
-            usuarios_pendientes: vec![],
-            usuarios_rechazados: vec![],
-            votacion_iniciada: false,
-            fecha_inicio: 50,
-            fecha_final: 150,
-            resultados: None,
-        });
+            // Simular una elección válida con usuarios pendientes
+            contrato.elecciones.push(Eleccion {
+                id: 1,
+                candidatos: vec![],
+                votantes: vec![],
+                usuarios_rechazados: vec![],
+                usuarios_pendientes: vec![(id_usuario, TIPO_DE_USUARIO::VOTANTE)],
+                votacion_iniciada: false,
+                fecha_inicio: 0, 
+                fecha_final: 100, 
+                resultados: None,
+            });
 
-        // Caso 1: No es administrador
-        ink::env::test::set_caller::<ink::env::DefaultEnvironment>(accounts.bob);
-        assert_eq!(
-            contrato.iniciar_votacion_privado(1),
-            Err(String::from("No eres el administrador."))
-        );
+            // Ejecutar el método para obtener el siguiente usuario pendiente en la elección
+            let result_obtener = contrato.obtener_siguiente_usuario_pendiente_en_una_eleccion_privado(1);
 
-        // Caso 2: Elección no encontrada
-        ink::env::test::set_caller::<ink::env::DefaultEnvironment>(accounts.alice); // Restaurar administrador
-        assert_eq!(
-            contrato.iniciar_votacion_privado(2),
-            Err(String::from("No existe una elección con ese id."))
-        );
+            // Verificar el resultado esperado
+            assert!(result_obtener.is_ok(), "Error al obtener el siguiente usuario pendiente en la elección");
 
-        // Caso 3: Votación ya finalizó
-        ink::env::test::advance_block::<ink::env::DefaultEnvironment>();
-        ink::env::test::set_block_timestamp::<ink::env::DefaultEnvironment>(200);
-        assert_eq!(
-            contrato.iniciar_votacion_privado(1),
-            Err(String::from("La votación ya finalizó."))
-        );
+            // Ejecutar el método para obtener el siguiente usuario pendiente en la elección
+            let result_obtener = contrato.obtener_siguiente_usuario_pendiente_en_una_eleccion_privado(1);
 
-        // Caso 4: Votación ya inició
-        ink::env::test::set_block_timestamp::<ink::env::DefaultEnvironment>(100); // Restaurar el timestamp del bloque
-        contrato.elecciones[0].votacion_iniciada = true;
-        assert_eq!(
-            contrato.iniciar_votacion_privado(1),
-            Err(String::from("La votación ya inició."))
-        );
+            // Verificar el resultado esperado
+            assert!(result_obtener.is_ok(), "Error al obtener el siguiente usuario pendiente en la elección");
+        }
 
-        // Caso 5: Todavía no es la fecha para la votación
-        contrato.elecciones[0].votacion_iniciada = false;
-        ink::env::test::set_block_timestamp::<ink::env::DefaultEnvironment>(30); // Cambiar el timestamp del bloque
-        assert_eq!(
-            contrato.iniciar_votacion_privado(1),
-            Err(String::from("Todavía no es la fecha para la votación."))
-        );
+        #[ink::test]
+        fn test_obtener_siguiente_usuario_pendiente_en_una_eleccion_privado_exito_CANDIDATO() {
+            let mut contrato = TrabajoFinal::new();
+            let id_administrador = AccountId::from([1; 32]); 
+            let id_usuario = AccountId::from([2; 32]);
 
-        // Caso 6: Se inició la votación exitosamente
-        ink::env::test::set_block_timestamp::<ink::env::DefaultEnvironment>(100); // Restaurar el timestamp del bloque
-        assert_eq!(
-            contrato.iniciar_votacion_privado(1),
-            Ok(String::from("Se inició la votación exitosamente."))
-        );
-        assert!(contrato.elecciones[0].votacion_iniciada);
-    }
-    
+            // Simular un administrador registrado
+            contrato.administrador = id_administrador;
+
+            // Simular una elección válida con usuarios pendientes
+            contrato.elecciones.push(Eleccion {
+                id: 1,
+                candidatos: vec![],
+                votantes: vec![],
+                usuarios_rechazados: vec![],
+                usuarios_pendientes: vec![(id_usuario, TIPO_DE_USUARIO::CANDIDATO)],
+                votacion_iniciada: false,
+                fecha_inicio: 0, 
+                fecha_final: 100, 
+                resultados: None,
+            });
+
+            // Ejecutar el método para obtener el siguiente usuario pendiente en la elección
+            let result_obtener = contrato.obtener_siguiente_usuario_pendiente_en_una_eleccion_privado(1);
+
+            // Verificar el resultado esperado
+            assert!(result_obtener.is_ok(), "Error al obtener el siguiente usuario pendiente en la elección");
+
+            // Ejecutar el método para obtener el siguiente usuario pendiente en la elección
+            let result_obtener = contrato.obtener_siguiente_usuario_pendiente_en_una_eleccion_privado(1);
+
+            // Verificar el resultado esperado
+            assert!(result_obtener.is_ok(), "Error al obtener el siguiente usuario pendiente en la elección");
+        }
+
+
+        #[ink::test]
+        fn test_obtener_siguiente_usuario_pendiente_en_una_eleccion_privado_fallo_eleccion_inexistente() {
+            let mut contrato = TrabajoFinal::new();
+            let id_administrador = AccountId::from([1; 32]);
+            let id_usuario = AccountId::from([2; 32]);
+
+            // Simular un administrador registrado
+            contrato.administrador = id_administrador;
+
+            // Simular una elección válida con usuarios pendientes
+            contrato.elecciones.push(Eleccion {
+                id: 1,
+                candidatos: vec![],
+                votantes: vec![],
+                usuarios_rechazados: vec![],
+                usuarios_pendientes: vec![(id_usuario, TIPO_DE_USUARIO::VOTANTE)],
+                votacion_iniciada: false,
+                fecha_inicio: 0, 
+                fecha_final: 100, 
+                resultados: None,
+            });
+
+            // Ejecutar el método para obtener el siguiente usuario pendiente en la elección
+            let result_obtener = contrato.obtener_siguiente_usuario_pendiente_en_una_eleccion_privado(10);
+
+            // Verificar el resultado esperado
+            assert!(result_obtener.is_err(), "Se esperaba un error al obtener el siguiente usuario pendiente en la elección (no se encontró elección)");
+        }
+
+        #[ink::test]
+        fn test_obtener_siguiente_usuario_pendiente_en_una_eleccion_privado_fallo_sin_usuarios_pendientes() {
+            // Configuración inicial del contrato y del contexto de prueba
+            let mut contrato = TrabajoFinal::new();
+            let id_administrador = AccountId::from([1; 32]); // Ejemplo de ID de administrador
+
+            // Simular un administrador registrado
+            contrato.administrador = id_administrador;
+
+            // Simular una elección válida sin usuarios pendientes
+            contrato.elecciones.push(Eleccion {
+                id: 1,
+                candidatos: vec![],
+                votantes: vec![],
+                usuarios_rechazados: vec![],
+                usuarios_pendientes: vec![],
+                votacion_iniciada: false,
+                fecha_inicio: 0, // Ajustar según la lógica de tu contrato
+                fecha_final: 100, // Ajustar según la lógica de tu contrato
+                resultados: None,
+            });
+
+            // Ejecutar el método para obtener el siguiente usuario pendiente en la elección
+            let result_obtener = contrato.obtener_siguiente_usuario_pendiente_en_una_eleccion_privado(1);
+
+            // Verificar el resultado esperado
+            assert!(result_obtener.is_err(), "Se esperaba un error al obtener el siguiente usuario pendiente en la elección (ningún usuario pendiente)");
+        }
     }
 
 }    
