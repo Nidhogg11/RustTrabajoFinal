@@ -7,6 +7,7 @@ mod TrabajoFinal {
     use ink::prelude::string::String;
     use ink::prelude::vec::Vec;
     use scale_info::prelude::format;
+    use ink::env::test::advance_block;
     use ink::prelude::string::ToString;
 
     enum ERRORES
@@ -227,7 +228,6 @@ mod TrabajoFinal {
         
         fn es_generador_reportes(&self) -> bool
         {
-            if !self.env().is_contract(&self.env().caller()) { return false; }
             match self.generador_reportes { 
                 None => false,
                 Some(val) => self.env().caller() == val
@@ -690,8 +690,7 @@ mod TrabajoFinal {
             if !self.es_generador_reportes() { return Err(String::from("No es el generador de reportes!")); }
             let block_timestamp = self.env().block_timestamp();
 
-            let eleccion_option = self.obtener_eleccion_por_id(eleccion_id);
-            match eleccion_option {
+            match self.obtener_eleccion_por_id(eleccion_id){
                 Some(eleccion) => {
                     // verificacion pobre
                     if eleccion.fecha_final > block_timestamp {
@@ -730,12 +729,16 @@ mod TrabajoFinal {
 
     #[cfg(test)]
     mod tests {
+        use core::ops::{AddAssign, SubAssign};
+
         use super::*;
+        use ink::codegen::Env;
+        use ink::env::test::advance_block;
         use ink::env::test::{
             default_accounts, get_account_balance, recorded_events,
             DefaultAccounts, EmittedEvent
         };
-        use ink::env::DefaultEnvironment;
+        use ink::env::{DefaultEnvironment, Environment};
         
         fn get_default_test_accounts(
         ) -> DefaultAccounts<ink::env::DefaultEnvironment> {
@@ -908,28 +911,6 @@ mod TrabajoFinal {
             let result = eleccion.procesar_siguiente_usuario_pendiente(false);
             assert_eq!(result, Err(String::from("No hay usuarios pendientes.")));
         }
-        #[test]
-        fn test_obtener_informacion_siguiente_usuario_pendiente() {
-            let administrador: AccountId = AccountId::from([0x1; 32]);
-            let otro_usuario: AccountId = AccountId::from([0x2; 32]);
-            set_caller(administrador);
-
-            let mut contrato = TrabajoFinal::new();
-            
-            let usuario = Usuario { id: (otro_usuario), nombre: ("Joaquin".to_string()), apellido: ("Fontana".to_string()), dni: ("22222222".to_string()) };
-            let mut str = String::from("Nombre: ") + usuario.nombre.as_str();
-            str.push_str((String::from("\nApellido: ") + usuario.apellido.as_str()).as_str());
-            str.push_str((String::from("\nDNI: ") + usuario.apellido.as_str()).as_str());
-            //Intentar obtener informacion sin usuarios pendientes
-            let result = contrato.obtener_informacion_siguiente_usuario_pendiente();
-            assert!(result.is_err());
-            
-            contrato.usuarios_pendientes.push(usuario);
-
-            let result = contrato.obtener_informacion_siguiente_usuario_pendiente();
-            assert!(result.is_ok_and(|info| info == str));
-        }
-        
         // ====================== FIN TESTS ELECCION ======================
         // ====================== FIN TESTS ELECCION ======================
         // ====================== FIN TESTS ELECCION ======================
@@ -959,7 +940,7 @@ mod TrabajoFinal {
         // ====================== INICIO TESTS SISTEMA ELECCIONES ======================
         // ====================== INICIO TESTS SISTEMA ELECCIONES ======================
         // ====================== INICIO TESTS SISTEMA ELECCIONES ======================
-    
+        
         #[test]
         fn test_constructor() {
             let accounts = get_default_test_accounts();
@@ -998,7 +979,27 @@ mod TrabajoFinal {
             let candidato_info = eleccion.obtener_informacion_candidato(3);
             assert!(candidato_info.is_none());
         }
-        
+        #[test]
+        fn test_obtener_informacion_siguiente_usuario_pendiente() {
+            let administrador: AccountId = AccountId::from([0x1; 32]);
+            let otro_usuario: AccountId = AccountId::from([0x2; 32]);
+            set_caller(administrador);
+
+            let mut contrato = TrabajoFinal::new();
+            
+            let usuario = Usuario { id: (otro_usuario), nombre: ("Joaquin".to_string()), apellido: ("Fontana".to_string()), dni: ("22222222".to_string()) };
+            let mut str = String::from("Nombre: ") + usuario.nombre.as_str();
+            str.push_str((String::from("\nApellido: ") + usuario.apellido.as_str()).as_str());
+            str.push_str((String::from("\nDNI: ") + usuario.apellido.as_str()).as_str());
+            //Intentar obtener informacion sin usuarios pendientes
+            let result = contrato.obtener_informacion_siguiente_usuario_pendiente();
+            assert!(result.is_err());
+            
+            contrato.usuarios_pendientes.push(usuario);
+
+            let result = contrato.obtener_informacion_siguiente_usuario_pendiente();
+            assert!(result.is_ok_and(|info| info == str));
+        }
         #[test]
         fn test_transferir_administrador() {
             let accounts = get_default_test_accounts();
@@ -1325,8 +1326,33 @@ mod TrabajoFinal {
             let result = contrato.procesar_usuarios_en_una_eleccion(2, true);
             assert_eq!(result, Err(String::from("Eleccion no encontrada")));
         } 
-        
-        
+        #[ink::test]
+        fn test_obtener_candidatos_eleccion_por_id(){
+            let administrador: AccountId = AccountId::from([0x1; 32]);
+            let generador_reportes: AccountId = AccountId::from([0x2; 32]);
+            set_caller(administrador);
+            
+            let mut contrato = TrabajoFinal::new();
+            assert!(contrato.asignar_generador_reportes(generador_reportes).is_ok());
+            assert!(contrato.generador_reportes.is_some_and(|id| id == generador_reportes));
+            
+            set_caller(generador_reportes);
+            let mut eleccion = setup_eleccion();
+            let eleccion_id = eleccion.id;
+            eleccion.fecha_final = contrato.env().block_timestamp();
+            
+            contrato.elecciones.push(eleccion);
+            advance_block::<ink::env::DefaultEnvironment>();
+            
+            let resultado = contrato.obtener_candidatos_eleccion_por_id_privado(eleccion_id);
+            
+            // Verificar el resultado y manejar el error
+            assert!(
+                resultado.is_ok(),
+                "Error al obtener candidatos para la elección: {:?}",
+                resultado.unwrap_err().to_string()
+            );
+            }
     }
 
 }    
