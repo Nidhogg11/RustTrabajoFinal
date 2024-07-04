@@ -920,7 +920,7 @@ mod TrabajoFinal {
         }
     
         #[test]
-        fn test_constructor_transferir_administrador() {
+        fn test_transferir_administrador() {
             let accounts = get_default_test_accounts();
             let alice = accounts.alice;
             let charlie = accounts.charlie;
