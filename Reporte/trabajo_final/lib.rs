@@ -644,7 +644,7 @@ mod TrabajoFinal {
         #[ink(message)]
         pub fn obtener_informacion_usuario(&self, user_id: AccountId) -> Option<(String, String, String)> 
         {
-            self.obtener_informacion_usuario_privado(eleccion_id)
+            self.obtener_informacion_usuario_privado(user_id)
         }
         pub fn obtener_informacion_usuario_privado(&self, user_id: AccountId) -> Option<(String, String, String)> 
         {
