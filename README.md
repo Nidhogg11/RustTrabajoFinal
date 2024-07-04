@@ -11,12 +11,12 @@
 - [x] Votar candidato en elección (Votante)
 - [x] Obtener información de candidato en elección (Todos)
 - [x] Transferir administrador (Administrador)
-- [ ] Obtener conteo de votos (Todos) [Dato: El conteo se realiza si una persona cualquiera es la primera en querer ver los resultados, después se deberían de almacenar en la blockchain y listo. Aparte de eso, el conteo no debería de realizarse si la votación no finalizó (checkear tiempos)]
+- [x] Obtener conteo de votos (Todos) [Dato: El conteo se realiza si una persona cualquiera es la primera en querer ver los resultados, después se deberían de almacenar en la blockchain y listo. Aparte de eso, el conteo no debería de realizarse si la votación no finalizó (checkear tiempos)]
 - [ ] Tests
 - [ ] Documentacion
 
 Generación de reportes (Otro contrato):
-- [ ] Crear contrato
-- [ ] Obtener reporte de registro de votantes de cierta elección (Todos) [No creo que sea información, sino un número, cantidad de votantes registrados, cantidad aceptados]
-- [ ] Obtener participación de cierta elección (Todos) [Solo se puede obtener cuando la elección finalizó]
-- [ ] Reporte de resultado de una elección (Todos) [Solo se puede cuando la elección cerró, el reporte genera un resultado con el nombre del candidato y la cantidad de votos y porcentaje, ordenado de forma descendente]
+- [x] Crear contrato
+- [x] Obtener reporte de registro de votantes de cierta elección (Todos) [No creo que sea información, sino un número, cantidad de votantes registrados, cantidad aceptados]
+- [x] Obtener participación de cierta elección (Todos) [Solo se puede obtener cuando la elección finalizó]
+- [x] Reporte de resultado de una elección (Todos) [Solo se puede cuando la elección cerró, el reporte genera un resultado con el nombre del candidato y la cantidad de votos y porcentaje, ordenado de forma descendente]

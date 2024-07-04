@@ -692,17 +692,21 @@ mod TrabajoFinal {
         }
 
         #[ink(message)]
-        pub fn obtener_resultados(&mut self,eleccion_id: u64) -> Option<Resultados> {
+        pub fn obtener_resultados(&mut self,eleccion_id: u64) -> Result<Resultados, String> {
             let block_timestamp= self.env().block_timestamp();
             let eleccion = match self.obtener_eleccion_por_id(eleccion_id){
                 Some(eleccion) => eleccion,
-                None => return None
+                None => return Err(String::from("No se encontró una elección con ese id."))
             };
 
             match eleccion.obtener_resultados_votacion(block_timestamp) {
-                None => None,
-                Some(resultados) => Some(resultados.clone())
+                None => Err(String::from("Todavía no están los resultados de la elección publicados.")),
+                Some(resultados) => Ok(resultados.clone())
             }
+        }
+
+        pub fn obtener_resultados_privado(&mut self, eleccion_id:u64) -> Result<Resultados, String> {
+            self.obtener_resultados(eleccion_id)
         }
     }
    
