@@ -349,7 +349,7 @@ mod TrabajoFinal {
                 Some(usuario) => {
                     let mut str = String::from("Nombre: ") + usuario.nombre.as_str();
                     str.push_str((String::from("\nApellido: ") + usuario.apellido.as_str()).as_str());
-                    str.push_str((String::from("\nDNI: ") + usuario.apellido.as_str()).as_str());
+                    str.push_str((String::from("\nDNI: ") + usuario.dni.as_str()).as_str());
                     return Ok(str);
                 },
                 None => Err(String::from("No hay usuarios pendientes.")),
@@ -949,6 +949,120 @@ mod TrabajoFinal {
             let result = eleccion.procesar_siguiente_usuario_pendiente(false);
             assert_eq!(result, Err(String::from("No hay usuarios pendientes.")));
         }
+
+        #[test]
+	fn test_votar_a_candidato_privado() {
+		let accounts = get_default_test_accounts();
+		let alice = accounts.alice;
+		let charlie = accounts.charlie;
+		let bob = accounts.bob;
+
+		set_caller(alice);
+		let mut contrato = TrabajoFinal::new();
+		let nueva_eleccion = contrato.crear_eleccion_privado(
+                String::from("01-07-2024 12:00"),
+                String::from("31-12-2024 12:00"),
+		);
+		assert_eq!(nueva_eleccion, Ok(format!("Eleccion creada exitosamente. Id de la elección: 1")) );
+		contrato.activar_registro_privado();
+
+		// Usuarios se registran
+		set_caller(bob);
+		let result = contrato.registrarse_privado("Bob".to_string(), "Asd".to_string(), "12345678".to_string() );
+		assert_eq!(result, Ok("Registro exitoso. Se te añadió en la cola de usuarios pendientes.".to_string()) );
+		set_caller(charlie);
+		contrato.registrarse_privado("Charlie".to_string(), "Dsa".to_string(), "87654321".to_string() );
+		assert_eq!(result, Ok("Registro exitoso. Se te añadió en la cola de usuarios pendientes.".to_string()) );
+
+		// Alice aprueba registro en sistema
+		set_caller(alice);
+		contrato.procesar_siguiente_usuario_pendiente_privado(true);
+		contrato.procesar_siguiente_usuario_pendiente_privado(true);
+	
+		// Usuarios se registran en eleccion
+		set_caller(bob);
+		contrato.ingresar_a_eleccion_privado(1, TIPO_DE_USUARIO::CANDIDATO);
+		set_caller(charlie);
+		contrato.ingresar_a_eleccion_privado(1, TIPO_DE_USUARIO::VOTANTE);
+
+		set_caller(alice);
+		let result = contrato.procesar_usuarios_en_una_eleccion_privado(1, true);
+		assert_eq!(result, Ok(String::from("Usuario agregado exitosamente.")));
+		let result = contrato.procesar_usuarios_en_una_eleccion_privado(1, true);
+		assert_eq!(result, Ok(String::from("Usuario agregado exitosamente.")));
+
+		// Vota en eleccion usuario no registrado
+		set_caller(alice);
+                let result = contrato.votar_a_candidato_privado(1, 1);
+                assert_eq!(result, Err(String::from("No estás registrado en el sistema. Espera a que te acepten en el mismo o realiza la solicitud.")) );
+
+		set_caller(charlie);
+		// Vota en eleccion que todavia no inicio
+                let result = contrato.votar_a_candidato_privado(1, 1);
+                assert_eq!(result, Err(String::from("Todavía no es la fecha para la votación.")) );
+
+		contrato.elecciones[0].votacion_iniciada = true;
+                // Voto a candidato inexistente
+                let result = contrato.votar_a_candidato_privado(1, 2);
+                assert_eq!(result, Err(String::from("No existe un candidato con este id.")) );
+
+		// Voto exitoso
+		let result = contrato.votar_a_candidato_privado(1, 1);
+		assert_eq!(result, Ok(String::from("Voto emitido exitosamente.")));
+
+		// Volver a votar en una eleccion que ya voto
+                let result = contrato.votar_a_candidato_privado(1, 1);
+                assert_eq!(result, Err("No se realizó el voto porque ya votaste anteriormente.".to_string() ));
+
+		// Vota eleccion inexistente
+                let result = contrato.votar_a_candidato_privado(7, 1);
+                assert_eq!(result, Err(String::from("No existe una elección con ese id.")) );
+		
+		// Usuario no registrado como votante trata de votar
+		set_caller(bob);
+		let result = contrato.votar_a_candidato_privado(1, 1);
+		assert_eq!(result, Err(String::from("No estás registrado en la elección.")) );
+	}
+
+	#[test]
+	fn test_obtener_informacion_siguiente_usuario_pendiente_privado() {
+        let accounts = get_default_test_accounts();
+        let alice = accounts.alice;
+        let charlie = accounts.charlie;
+        let bob = accounts.bob;
+
+        set_caller(alice);
+        let mut contrato = TrabajoFinal::new();
+		contrato.activar_registro_privado();
+		let result = contrato.obtener_informacion_siguiente_usuario_pendiente();
+		assert_eq!(result, Err(String::from("No hay usuarios pendientes.")) );
+		
+		set_caller(bob);
+		let result = contrato.registrarse_privado("Bob".to_string(), "Asd".to_string(), "12345678".to_string() );
+		assert_eq!(contrato.usuarios_pendientes.len(), 1);
+		
+		set_caller(alice);
+		let result = contrato.obtener_informacion_siguiente_usuario_pendiente();
+		let string_bob = "Nombre: Bob\nApellido: Asd\nDNI: 12345678".to_string();
+		assert_eq!(result, Ok(string_bob) );
+
+		set_caller(charlie);
+		let result = contrato.registrarse_privado("Charlie".to_string(), "Asd".to_string(), "12345678".to_string() );
+		assert_eq!(contrato.usuarios_pendientes.len(), 2);
+
+		set_caller(alice);
+		// Aprobamos a Bob para ver la informacion de Charlie
+		contrato.procesar_siguiente_usuario_pendiente_privado(true);
+
+        let result = contrato.obtener_informacion_siguiente_usuario_pendiente();
+        let string_charlie = "Nombre: Charlie\nApellido: Asd\nDNI: 12345678".to_string();
+        assert_eq!(result, Ok(string_charlie) );
+
+		// Aprobamos a todos los usuarios pendientes y volvemos a consultar
+		contrato.procesar_siguiente_usuario_pendiente_privado(true);
+        let result = contrato.obtener_informacion_siguiente_usuario_pendiente();
+        assert_eq!(result, Err(String::from("No hay usuarios pendientes.")) );
+	}
         // ====================== FIN TESTS ELECCION ======================
         // ====================== FIN TESTS ELECCION ======================
         // ====================== FIN TESTS ELECCION ======================
@@ -1028,7 +1142,7 @@ mod TrabajoFinal {
             let usuario = Usuario { id: (otro_usuario), nombre: ("Joaquin".to_string()), apellido: ("Fontana".to_string()), dni: ("22222222".to_string()) };
             let mut str = String::from("Nombre: ") + usuario.nombre.as_str();
             str.push_str((String::from("\nApellido: ") + usuario.apellido.as_str()).as_str());
-            str.push_str((String::from("\nDNI: ") + usuario.apellido.as_str()).as_str());
+            str.push_str((String::from("\nDNI: ") + usuario.dni.as_str()).as_str());
             //Intentar obtener informacion sin usuarios pendientes
             let result = contrato.obtener_informacion_siguiente_usuario_pendiente();
             assert!(result.is_err());
@@ -1058,6 +1172,30 @@ mod TrabajoFinal {
             assert!(result.is_err());
             assert_ne!(sistema_elecciones.administrador, alice);
             assert_eq!(sistema_elecciones.administrador, charlie);
+        }
+
+        #[ink::test]
+        fn test_obtener_candidatos_eleccion_por_id(){
+            let administrador: AccountId = AccountId::from([0x1; 32]);
+            let generador_reportes: AccountId = AccountId::from([0x2; 32]);
+            set_caller(administrador);
+            let mut contrato = TrabajoFinal::new();
+            assert!(contrato.asignar_generador_reportes(generador_reportes).is_ok());
+            assert!(contrato.generador_reportes.is_some_and(|id| id == generador_reportes));
+            let mut eleccion = setup_eleccion();
+            let eleccion_id = eleccion.id;
+            eleccion.fecha_final = contrato.env().block_timestamp();
+            contrato.elecciones.push(eleccion);
+            advance_block::<ink::env::DefaultEnvironment>();
+            set_caller(generador_reportes);
+            let resultado = contrato.obtener_candidatos_eleccion_por_id_privado(eleccion_id);
+
+            // Verificar el resultado y manejar el error
+            assert!(
+                resultado.is_ok(),
+                "Error al obtener candidatos para la elección: {:?}",
+                resultado.unwrap_err().to_string()
+            );
         }
     
         #[ink::test]
