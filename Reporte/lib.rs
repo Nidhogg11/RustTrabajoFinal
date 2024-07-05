@@ -56,8 +56,8 @@ mod Reporte {
             };
 
             let cantidad_votantes = datos_votantes.len() as u32;
-            let cantidad_votantes_voto_efectivo = datos_votantes.iter().filter(|vot| vot.1).count() as u32;
-            let porcentaje_participacion = (cantidad_votantes_voto_efectivo.div_euclid(cantidad_votantes)).mul(100);
+            let cantidad_votantes_voto_efectivo = datos_votantes.iter().filter(|vot: &&(ink::primitives::AccountId, bool)| vot.1).count() as u32;
+            let porcentaje_participacion = cantidad_votantes_voto_efectivo.mul(100).div_ceil(cantidad_votantes);
             Ok( (cantidad_votantes_voto_efectivo, porcentaje_participacion) )
         }
 
