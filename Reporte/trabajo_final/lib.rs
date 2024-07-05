@@ -7,8 +7,6 @@ mod TrabajoFinal {
     use ink::prelude::string::String;
     use ink::prelude::vec::Vec;
     use scale_info::prelude::format;
-    use ink::env::test::advance_block;
-    use ink::prelude::string::ToString;
 
     enum ERRORES
     {
@@ -16,8 +14,8 @@ mod TrabajoFinal {
         USUARIO_NO_REGISTRADO,
     }
 
-    #[derive(scale::Decode, scale::Encode, Debug)]
-    #[cfg_attr(feature = "std", derive(scale_info::TypeInfo, ink::storage::traits::StorageLayout,PartialEq,Clone))]
+    #[derive(scale::Decode, scale::Encode, Debug, PartialEq)]
+    #[cfg_attr(feature = "std", derive(scale_info::TypeInfo, ink::storage::traits::StorageLayout,Clone))]
     pub enum TIPO_DE_USUARIO
     {
         VOTANTE,
@@ -239,12 +237,13 @@ mod TrabajoFinal {
             self.env().caller() == self.administrador
         }
 
-        fn obtener_usuario(&self, id: AccountId) -> Option<&Usuario> {
-            // let id = self.env().caller();
+        fn obtener_usuario(&self, id: AccountId) -> Option<&Usuario> 
+        {
             self.usuarios.iter().find(|usuario| usuario.id == id)
         }
 
-        fn es_usuario_registrado(&self) -> bool {
+        fn es_usuario_registrado(&self) -> bool
+        {
             let id = self.env().caller();
             self.usuarios.iter().any(|usuario| usuario.id == id)
         }
@@ -257,10 +256,7 @@ mod TrabajoFinal {
 
         fn existe_eleccion(&self, eleccion_id:u64) -> bool
         {
-            if eleccion_id >= 1 && eleccion_id <= self.elecciones.len() as u64 {
-                return true;
-            }
-            return false;
+            eleccion_id >= 1 && eleccion_id <= self.elecciones.len() as u64
         }
 
         fn obtener_eleccion_por_id(&mut self, eleccion_id:u64) -> Option<&mut Eleccion>
@@ -274,18 +270,19 @@ mod TrabajoFinal {
             return None;
         }
 
-         fn obtener_ref_eleccion_por_id(&self, eleccion_id:u64) -> Option<&Eleccion>
-            {
-             if self.existe_eleccion(eleccion_id) {
-                 match eleccion_id.checked_sub(1) {
-                     Some(index_valid) => return Some(&self.elecciones[index_valid as usize]),
-                     None => return None
-                 }
-             }
-             return None;
-         }
+        fn obtener_ref_eleccion_por_id(&self, eleccion_id:u64) -> Option<&Eleccion>
+        {
+            if self.existe_eleccion(eleccion_id) {
+                match eleccion_id.checked_sub(1) {
+                    Some(index_valid) => return Some(&self.elecciones[index_valid as usize]),
+                    None => return None
+                }
+            }
+            return None;
+        }
 
-        fn validar_estado_eleccion(&mut self,eleccion_id:u64,block_timestamp:u64,id_usuario:AccountId) -> Result<&mut Eleccion,String>{
+        fn validar_estado_eleccion(&mut self,eleccion_id:u64,block_timestamp:u64,id_usuario:AccountId) -> Result<&mut Eleccion,String>
+        {
             let option_eleccion = self.obtener_eleccion_por_id(eleccion_id);
             if option_eleccion.is_none() { return Err(String::from("No existe una elección con ese id.")); }
             
@@ -301,9 +298,9 @@ mod TrabajoFinal {
             Ok(eleccion)
         }
 
-        //  ----- Inicio Metodos publicos -------
-        //  ----- Inicio Metodos publicos -------
-        //  ----- Inicio Metodos publicos -------
+        // ====-----==== METODOS PÚBLICOS ====----====
+        // ====-----==== METODOS PÚBLICOS ====----====
+        // ====-----==== METODOS PÚBLICOS ====----====
 
         /// Utilizado por los usuarios para poder registrarse en el sistema.
         /// Luego de registrarse queda pendiente de aceptación por parte de un Administrador.
@@ -333,6 +330,8 @@ mod TrabajoFinal {
             self.usuarios_pendientes.push(usuario);
             return Ok(String::from("Registro exitoso. Se te añadió en la cola de usuarios pendientes."));
         }
+        
+        // ====-----==== METODOS ADMINISTRADOR ====----====
 
         /// Utilizado por un Administrador.
         /// Obtiene la información del próximo usuario a registrarse.
@@ -383,9 +382,11 @@ mod TrabajoFinal {
         }
 
 
-        //  ----- METODOS ELECCIONES -------
-        //  ----- METODOS ELECCIONES -------
-        //  ----- METODOS ELECCIONES -------
+        // ====-----==== METODOS ELECCIONES ====----====
+        // ====-----==== METODOS ELECCIONES ====----====
+        // ====-----==== METODOS ELECCIONES ====----====
+
+        // ====-----==== METODOS ADMINISTRADOR ====----====
 
         /// Utilizado por un administrador.
         /// Crea una elección colocando fecha de inicio y final (Las fechas para que se correspondan a nuestro horario GTM-3/UTC-3 hay que sumarle 3 a la hora).
@@ -436,7 +437,6 @@ mod TrabajoFinal {
         {
             self.iniciar_votacion_privado(eleccion_id)
         }
-
         pub fn iniciar_votacion_privado(&mut self, eleccion_id:u64) -> Result<String, String>
         {
             if !self.es_administrador() { return Err(ERRORES::NO_ES_ADMINISTRADOR.to_string()); }
@@ -459,6 +459,56 @@ mod TrabajoFinal {
                 None => return Err(String::from("No existe una elección con ese id."))
             }
         }
+
+        /// Utilizado por un Administrador.
+        /// Obtiene la información del próximo usuario a registrarse.
+        #[ink(message)]
+        pub fn obtener_siguiente_usuario_pendiente_en_una_eleccion(&mut self, eleccion_id:u64) -> Result<String, String>
+        {
+            self.obtener_siguiente_usuario_pendiente_en_una_eleccion_privado(eleccion_id)
+        }
+        pub fn obtener_siguiente_usuario_pendiente_en_una_eleccion_privado(&mut self, eleccion_id:u64) -> Result<String, String>
+        {
+            if !self.es_administrador() { return Err(ERRORES::NO_ES_ADMINISTRADOR.to_string()); }
+            let eleccion_elegida = match self.obtener_eleccion_por_id(eleccion_id) {
+                Some(eleccion) => eleccion,
+                None => return Err(String::from("Eleccion no encontrada")),
+            };
+            let sig_usuario = eleccion_elegida.usuarios_pendientes.first();
+            match sig_usuario {
+                Some(usuario_eleccion) => {
+                    let mut datos_usuario = String::from("Usuario: ");
+                    datos_usuario.push_str( hex::encode(usuario_eleccion.0).as_str() );
+                    match usuario_eleccion.1 {
+                        TIPO_DE_USUARIO::VOTANTE => datos_usuario.push_str("\nEl usuario quiere ser un VOTANTE"),
+                        TIPO_DE_USUARIO::CANDIDATO => datos_usuario.push_str("\nEl usuario quiere ser un CANDIDATO")
+                    };
+                    Ok(datos_usuario)
+                },
+                None => Err(String::from("No hay usuarios pendientes.")),
+            }
+        }
+
+        /// Utilizado por un Administrador.
+        /// Se procesará el próximo usuario pendiente en una eleccion particular.
+        /// y se lo coloca en el vector de candidato o votante en esa eleccion segun que quiera ser.
+        #[ink(message)]
+        pub fn procesar_usuarios_en_una_eleccion(&mut self, eleccion_id:u64,aceptar_usuario:bool) -> Result<String, String>
+        {
+            self.procesar_usuarios_en_una_eleccion_privado(eleccion_id,aceptar_usuario)
+        }
+        pub fn procesar_usuarios_en_una_eleccion_privado(&mut self, eleccion_id:u64,aceptar_usuario:bool) -> Result<String, String>
+        {
+            if !self.es_administrador() { return Err(ERRORES::NO_ES_ADMINISTRADOR.to_string()); }
+            
+            let eleccion_elegida = match self.obtener_eleccion_por_id(eleccion_id) {
+                Some(eleccion) => eleccion,
+                None => return Err(String::from("Eleccion no encontrada")),
+            };
+            return eleccion_elegida.procesar_siguiente_usuario_pendiente(aceptar_usuario);
+        }
+
+        // ====-----==== METODOS PÚBLICOS ====----====
 
         /// Utilizado por los usuarios registrados en el sistema para poder ingresar a una elección.
         /// Un usuario registrado y que no está registrado en la elección puede ingresar a la misma como candidato o votante.
@@ -492,55 +542,6 @@ mod TrabajoFinal {
             eleccion.usuarios_pendientes.push((id,tipo));
 
             return Ok(String::from("Ingresó a la elección correctamente Pendiente de aprobacion del Administrador"));
-        }
-
-        /// Utilizado por un Administrador.
-        /// Obtiene la información del próximo usuario a registrarse.
-        #[ink(message)]
-        pub fn obtener_siguiente_usuario_pendiente_en_una_eleccion(&mut self, eleccion_id:u64) -> Result<String, String>
-        {
-            self.obtener_siguiente_usuario_pendiente_en_una_eleccion_privado(eleccion_id)
-        }
-        pub fn obtener_siguiente_usuario_pendiente_en_una_eleccion_privado(&mut self, eleccion_id:u64) -> Result<String, String>
-        {
-            if !self.es_administrador() { return Err(ERRORES::NO_ES_ADMINISTRADOR.to_string()); }
-            let eleccion_elegida = match self.obtener_eleccion_por_id(eleccion_id) {
-                Some(eleccion) => eleccion,
-                None => return Err(String::from("Eleccion no encontrada")),
-            };
-            let sig_usuario = eleccion_elegida.usuarios_pendientes.first();
-            match sig_usuario {
-                Some(usuario_eleccion) => {
-                    let mut datos_usuario = String::from("Usuario: ");
-                    datos_usuario.push_str( hex::encode(usuario_eleccion.0).as_str() );
-                    match usuario_eleccion.1 {
-                        TIPO_DE_USUARIO::VOTANTE => datos_usuario.push_str("\nEl usuario quiere ser un VOTANTE"),
-                        TIPO_DE_USUARIO::CANDIDATO => datos_usuario.push_str("\nEl usuario quiere ser un CANDIDATO")
-                    };
-                    Ok(datos_usuario)
-                },
-                None => Err(String::from("No hay usuarios pendientes.")),
-            }
-        }
-
-
-        /// Utilizado por un Administrador.
-        /// Se procesará el próximo usuario pendiente en una eleccion particular.
-        /// y se lo coloca en el vector de candidato o votante en esa eleccion segun que quiera ser.
-        #[ink(message)]
-        pub fn procesar_usuarios_en_una_eleccion(&mut self, eleccion_id:u64,aceptar_usuario:bool) -> Result<String, String>
-        {
-            self.procesar_usuarios_en_una_eleccion_privado(eleccion_id,aceptar_usuario)
-        }
-        pub fn procesar_usuarios_en_una_eleccion_privado(&mut self, eleccion_id:u64,aceptar_usuario:bool) -> Result<String, String>
-        {
-            if !self.es_administrador() { return Err(ERRORES::NO_ES_ADMINISTRADOR.to_string()); }
-            
-            let eleccion_elegida = match self.obtener_eleccion_por_id(eleccion_id) {
-                Some(eleccion) => eleccion,
-                None => return Err(String::from("Eleccion no encontrada")),
-            };
-            return eleccion_elegida.procesar_siguiente_usuario_pendiente(aceptar_usuario);
         }
         
         /// Utilizado por los usuarios registrados en el sistema y que están en la elección como votantes.
@@ -576,6 +577,30 @@ mod TrabajoFinal {
             }
         }
 
+        /// FALTA DOCUMENTACIÓN
+        #[ink(message)]
+        pub fn obtener_informacion_candidato_eleccion(&self, eleccion_id:u64, candidato_id:u32) -> Result<String, String>
+        {
+            self.obtener_informacion_candidato_eleccion_privado(eleccion_id, candidato_id)
+        }
+        fn obtener_informacion_candidato_eleccion_privado(&self, eleccion_id:u64, candidato_id:u32) -> Result<String, String>
+        {
+            let eleccion_elegida = match self.obtener_ref_eleccion_por_id(eleccion_id) {
+                Some(eleccion) => eleccion,
+                None => return Err(String::from("Eleccion no encontrada.")),
+            };
+            let candidato_info = match eleccion_elegida.obtener_informacion_candidato(candidato_id) {
+                Some(candidato) => candidato,
+                None => return Err(String::from("Candidato no encontrado.")),
+            };
+
+            let info = self.obtener_usuario(candidato_info.id).expect("No se pudo encontrar la información del candidato."); // Si se encuentra el candidato, DEBE estar registrado
+            let mut str = String::from("Nombre: ") + info.nombre.as_str();
+            str.push_str((String::from("\nApellido: ") + info.apellido.as_str()).as_str());
+            str.push_str((String::from("\nDNI: ") + info.dni.as_str()).as_str());
+            return Ok(str);
+        }
+
         // ====-----==== METODOS USADOS POR EL ADMINISTRADOR ====----====
         // ====-----==== METODOS USADOS POR EL ADMINISTRADOR ====----====
         // ====-----==== METODOS USADOS POR EL ADMINISTRADOR ====----====
@@ -596,7 +621,7 @@ mod TrabajoFinal {
         }
 
         /// Utilizado por un administrador.
-        /// desActiva el registro de usuarios si no está activo el registro.
+        /// Desactiva el registro de usuarios si no está activo el registro.
         #[ink(message)]
         pub fn desactivar_registro(&mut self) -> Result<String, String>
         {
@@ -625,6 +650,7 @@ mod TrabajoFinal {
         }
         
         /// Utilizado por el administrador.
+        /// Permite al administrador asignar un generador de reportes.
         #[ink(message)]
         pub fn asignar_generador_reportes(&mut self, id:AccountId) -> Result<String, String>
         {
@@ -637,11 +663,11 @@ mod TrabajoFinal {
             return Ok(String::from("Se asigno el generador reportes correctamente."));
         }
 
+        // ====-----==== METODOS PARA EL GENERADOR DE REPORTES ====----====
+        // ====-----==== METODOS PARA EL GENERADOR DE REPORTES ====----====
+        // ====-----==== METODOS PARA EL GENERADOR DE REPORTES ====----====
 
-        // ====-----==== METODOS PARA QUE USE EL OTRO CONTRATO ====----====
-        // ====-----==== METODOS PARA QUE USE EL OTRO CONTRATO ====----====
-        // ====-----==== METODOS PARA QUE USE EL OTRO CONTRATO ====----====
-
+        /// FALTA DOCUMENTACIÓN
         #[ink(message)]
         pub fn obtener_informacion_usuario(&self, user_id: AccountId) -> Option<(String, String, String)> 
         {
@@ -658,6 +684,7 @@ mod TrabajoFinal {
             }
         }
 
+        /// FALTA DOCUMENTACIÓN
         #[ink(message)]
         pub fn obtener_votantes_eleccion_por_id(&mut self, eleccion_id: u64) -> Result<Vec<(AccountId,bool)>, String>
         {
@@ -680,6 +707,8 @@ mod TrabajoFinal {
                 None => Err(String::from("La eleccion enviada no existe!")),
             }
         }
+
+        /// FALTA DOCUMENTACIÓN
         #[ink(message)]
         pub fn obtener_candidatos_eleccion_por_id(&mut self, eleccion_id: u64) -> Result<Vec<(AccountId,u32)>, String>
         {
@@ -702,7 +731,14 @@ mod TrabajoFinal {
             }
         }
 
-        fn obtener_resultados_privado(&mut self,eleccion_id: u64) -> Result<Resultados, String> {
+        /// FALTA DOCUMENTACIÓN
+        #[ink(message)]
+        pub fn obtener_resultados(&mut self, eleccion_id:u64) -> Result<Resultados, String> 
+        {
+            self.obtener_resultados_privado(eleccion_id)
+        }
+        fn obtener_resultados_privado(&mut self,eleccion_id: u64) -> Result<Resultados, String> 
+        {
             let block_timestamp= self.env().block_timestamp();
             let eleccion = match self.obtener_eleccion_por_id(eleccion_id){
                 Some(eleccion) => eleccion,
@@ -714,69 +750,33 @@ mod TrabajoFinal {
                 Some(resultados) => Ok(resultados.clone())
             }
         }
-        #[ink(message)]
-        pub fn obtener_resultados(&mut self, eleccion_id:u64) -> Result<Resultados, String> {
-            match self.obtener_resultados_privado(eleccion_id){
-                Err(mensaje) => Err(mensaje),
-                Ok(mensaje) =>  Ok(mensaje)
-            }
-        }
     }
-   
-        
-    
 
     #[cfg(test)]
     mod tests {
-        use core::ops::{AddAssign, SubAssign};
-
         use super::*;
         use ink::codegen::Env;
         use ink::env::test::advance_block;
-        use ink::env::test::{
-            default_accounts, get_account_balance, recorded_events, set_block_timestamp,
-            DefaultAccounts, EmittedEvent
-        };
+        use ink::env::test::{ default_accounts, set_block_timestamp, DefaultAccounts };
         use ink::env::DefaultEnvironment;
         
-        fn get_default_test_accounts(
-        ) -> DefaultAccounts<ink::env::DefaultEnvironment> {
+        fn get_default_test_accounts() -> DefaultAccounts<ink::env::DefaultEnvironment> 
+        {
             default_accounts::<ink::env::DefaultEnvironment>()
         }
     
-        // Sets caller returned by the next `Self::env().caller()` method call
-        // in the contract.
-        fn set_caller(caller: AccountId) {
+        fn set_caller(caller: AccountId) 
+        {
             ink::env::test::set_caller::<ink::env::DefaultEnvironment>(caller);
         }
 
-        fn set_contract(caller: AccountId) {
+        fn set_contract(caller: AccountId) 
+        {
             ink::env::test::set_contract::<ink::env::DefaultEnvironment>(caller);
         }
-    
-            // test errores
-        #[test]
-        fn test_no_es_administrador() {
-            let error = ERRORES::NO_ES_ADMINISTRADOR;
-            assert_eq!(error.to_string(), "No eres el administrador.");
-        }
-    
-        #[test]
-        fn test_usuario_no_registrado() {
-            let error = ERRORES::USUARIO_NO_REGISTRADO;
-            assert_eq!(error.to_string(), "No estás registrado en el sistema. Espera a que te acepten en el mismo o realiza la solicitud.");
-        }
-            // test errores
 
-        
-            #[test]
-            fn test_error_usuario_no_registrado() {
-                let error = ERRORES::USUARIO_NO_REGISTRADO;
-                assert_eq!(error.to_string(), "No estás registrado en el sistema. Espera a que te acepten en el mismo o realiza la solicitud.");
-            }
-    
-    
-        fn setup_eleccion() -> Eleccion {
+        fn setup_eleccion() -> Eleccion 
+        {
             Eleccion {
                 id: 1,
                 candidatos: Vec::new(),
@@ -789,13 +789,62 @@ mod TrabajoFinal {
                 resultados:None
             }
         }
+
+        fn crear_usuario(id: AccountId, nombre: &str, apellido: &str, dni: &str) -> Usuario 
+        {
+            Usuario {
+                id,
+                nombre: nombre.to_string(),
+                apellido: apellido.to_string(),
+                dni: dni.to_string(),
+            }
+        }
+
+        fn crear_trabajo_final(administrador: AccountId) -> TrabajoFinal 
+        {
+            TrabajoFinal {
+                administrador,
+                generador_reportes: None,
+                registro_activado: false,
+                usuarios: Vec::new(),
+                usuarios_pendientes: Vec::new(),
+                usuarios_rechazados: Vec::new(),
+                elecciones: Vec::new(),
+            }
+        }
     
-    
-        // ====================== INICIO TESTS ELECCION ======================
-        // ====================== INICIO TESTS ELECCION ======================
-        // ====================== INICIO TESTS ELECCION ======================
+        // ====================== INICIO TESTS ERRORES ======================
+        // ====================== INICIO TESTS ERRORES ======================
+        // ====================== INICIO TESTS ERRORES ======================
+
         #[test]
-        fn test_obtener_resultados_votacion() {
+        fn test_no_es_administrador() 
+        {
+            let error = ERRORES::NO_ES_ADMINISTRADOR;
+            assert_eq!(error.to_string(), "No eres el administrador.");
+        }
+    
+        #[test]
+        fn test_usuario_no_registrado() 
+        {
+            let error = ERRORES::USUARIO_NO_REGISTRADO;
+            assert_eq!(error.to_string(), "No estás registrado en el sistema. Espera a que te acepten en el mismo o realiza la solicitud.");
+        }
+            
+        #[test]
+        fn test_error_usuario_no_registrado() 
+        {
+            let error = ERRORES::USUARIO_NO_REGISTRADO;
+            assert_eq!(error.to_string(), "No estás registrado en el sistema. Espera a que te acepten en el mismo o realiza la solicitud.");
+        }
+    
+        // ====================== INICIO TESTS ELECCION ======================
+        // ====================== INICIO TESTS ELECCION ======================
+        // ====================== INICIO TESTS ELECCION ======================
+
+        #[test]
+        fn test_obtener_resultados_votacion() 
+        {
             let administrador: AccountId = AccountId::from([0x1; 32]);
             set_caller(administrador);
 
@@ -815,16 +864,17 @@ mod TrabajoFinal {
             );
 
             let eleccion = contrato.obtener_eleccion_por_id(1).unwrap();
-            assert!(eleccion.obtener_resultados_votacion(1675666400000).is_none());
+            assert!(eleccion.obtener_resultados_votacion(1675666400000).is_none()); // No obtiene resultados porque la elección no finalizó
 
             let eleccion = contrato.obtener_eleccion_por_id(2).unwrap();
             let resultados = Resultados {votos_totales:0, votos_candidatos:Vec::new(), votos_realizados: 0 };
-            assert_eq!(eleccion.obtener_resultados_votacion(1675666400000), Some(&resultados));
-            assert_eq!(eleccion.obtener_resultados_votacion(1675666400000), Some(&resultados));
+            assert_eq!(eleccion.obtener_resultados_votacion(1675666400000), Some(&resultados)); // Obtiene resultados, procesandolos por ser la primera vez
+            assert_eq!(eleccion.obtener_resultados_votacion(1675666400000), Some(&resultados)); // Obtiene de nuevo los resultados, pero no los procesa porque ya los tiene
         }
 
         #[ink::test]
-        fn test_desactivar_registro() {
+        fn test_desactivar_registro() 
+        {
             let mut contrato = TrabajoFinal::new();
             let id_administrador = AccountId::from([1; 32]); // Ejemplo de ID de administrador
 
@@ -842,7 +892,8 @@ mod TrabajoFinal {
         }
 
         #[ink::test]
-        fn test_obtener_resultados_privado_exito() {
+        fn test_obtener_resultados_privado_exito() 
+        {
             let mut contrato = TrabajoFinal::new();
             let id_administrador = AccountId::from([1; 32]); 
             let id_candidato_1 = AccountId::from([0x06; 32]);
@@ -887,7 +938,8 @@ mod TrabajoFinal {
         }
 
         #[ink::test]
-        fn test_obtener_resultados_privado_fallo_eleccion_inexistente() {
+        fn test_obtener_resultados_privado_fallo_eleccion_inexistente() 
+        {
             let mut contrato = TrabajoFinal::new();
             let id_administrador = AccountId::from([1; 32]);
 
@@ -914,7 +966,8 @@ mod TrabajoFinal {
         }
 
         #[ink::test]
-        fn test_obtener_resultados_privado_fallo_no_finalizo() {
+        fn test_obtener_resultados_privado_fallo_no_finalizo() 
+        {
             // Configuración inicial del contrato y del contexto de prueba
             let mut contrato = TrabajoFinal::new();
             let id_administrador = AccountId::from([1; 32]); // Ejemplo de ID de administrador
@@ -945,7 +998,8 @@ mod TrabajoFinal {
         }
 
         #[ink::test]
-        fn test_obtener_informacion_usuario(){
+        fn test_obtener_informacion_usuario()
+        {
             let generador_reportes = AccountId::from([0; 32]);
             let administrador = AccountId::from([1; 32]);
             let user_id = AccountId::from([2; 32]);
@@ -968,7 +1022,8 @@ mod TrabajoFinal {
         }
 
         #[test]
-        fn test_obtener_votantes_eleccion_por_id_privado() {
+        fn test_obtener_votantes_eleccion_por_id_privado() 
+        {
             let administrador: AccountId = AccountId::from([0x1; 32]);
             set_caller(administrador);
 
@@ -977,8 +1032,6 @@ mod TrabajoFinal {
 
             set_contract(administrador);
             
-            assert!(contrato.obtener_votantes_eleccion_por_id_privado(1).is_err());
-
             let _ = contrato.activar_registro();
             let _ = contrato.crear_eleccion_privado(
                 "01-01-2023 12:00".to_string(),
@@ -989,21 +1042,22 @@ mod TrabajoFinal {
                 "31-01-2023 12:00".to_string()
             );
 
-            assert!(contrato.obtener_votantes_eleccion_por_id_privado(1).is_err());
+            assert!(contrato.obtener_votantes_eleccion_por_id_privado(1).is_err()); // No se obtienen resultados porque no es el generador de reportes
             let _ = contrato.asignar_generador_reportes_privado(administrador);
-            assert!(contrato.obtener_votantes_eleccion_por_id_privado(1).is_err());
+            assert!(contrato.obtener_votantes_eleccion_por_id_privado(1).is_err()); // No se obtienen resultados porque la elección no finalizó
             
-            let err = contrato.obtener_votantes_eleccion_por_id_privado(2);
+            let err = contrato.obtener_votantes_eleccion_por_id_privado(2); // Se obtienen resultados porque es el generador de reportes y finalizó la elección
             assert!(err.is_ok());
 
-            let err = contrato.obtener_votantes_eleccion_por_id_privado(3);
+            let err = contrato.obtener_votantes_eleccion_por_id_privado(3); // No se obtienen resultados porque no existe la elección
             assert!(err.is_err());
         }
 
         #[test]
-        fn test_contiene_usuario_pendiente() {
+        fn test_contiene_usuario_pendiente() 
+        {
             let mut eleccion = setup_eleccion();
-            let accounts: DefaultAccounts<DefaultEnvironment> = get_default_test_accounts();//uentas predeterminadas utilizadas para tests
+            let accounts: DefaultAccounts<DefaultEnvironment> = get_default_test_accounts(); // Cuentas predeterminadas utilizadas para tests
             
             eleccion.usuarios_pendientes.push((accounts.alice, TIPO_DE_USUARIO::VOTANTE));
             
@@ -1012,7 +1066,8 @@ mod TrabajoFinal {
         }
     
         #[test]
-        fn test_existe_candidato() {
+        fn test_existe_candidato() 
+        {
             let mut eleccion = setup_eleccion();
             let accounts = get_default_test_accounts();
             
@@ -1027,7 +1082,8 @@ mod TrabajoFinal {
         }
     
         #[test]
-        fn test_votar_candidato() {
+        fn test_votar_candidato() 
+        {
             let mut eleccion = setup_eleccion();
             let accounts = get_default_test_accounts();
     
@@ -1049,7 +1105,8 @@ mod TrabajoFinal {
         }
     
         #[test]
-        fn test_procesar_siguiente_usuario_pendiente() {
+        fn test_procesar_siguiente_usuario_pendiente() 
+        {
             let mut eleccion = setup_eleccion();
             let accounts = get_default_test_accounts();
     
@@ -1071,36 +1128,55 @@ mod TrabajoFinal {
         }
     
         #[test]
-        fn test_obtener_informacion_candidato() {
-            let mut eleccion = setup_eleccion();
-            let accounts = get_default_test_accounts();
-            eleccion.candidatos.push(CandidatoConteo {
-                id: accounts.alice,
-                candidato_id: 1,
-                votos_totales: 0,
-            });
-            eleccion.candidatos.push(CandidatoConteo {
-                id: accounts.bob,
-                candidato_id: 2,
-                votos_totales: 0,
-            });
-    
-            let candidato_info = eleccion.obtener_informacion_candidato(1);
-            assert!(candidato_info.is_some());
-            assert_eq!(candidato_info.unwrap().id, accounts.alice);
-    
-            let candidato_info = eleccion.obtener_informacion_candidato(2);
-            assert!(candidato_info.is_some());
-            assert_eq!(candidato_info.unwrap().id, accounts.bob);
-    
-            let candidato_info = eleccion.obtener_informacion_candidato(3);
-            assert!(candidato_info.is_none());
+        fn test_obtener_informacion_candidato() 
+        {
+            let administrador: AccountId = AccountId::from([0x1; 32]);
+            let bob: AccountId = AccountId::from([0x2; 32]);
+            set_caller(administrador);
 
-            
+            let mut contrato = TrabajoFinal::new();
+
+            let _ = contrato.activar_registro();
+
+            let _ = contrato.crear_eleccion(
+                String::from("01-07-2024 12:00"),
+                String::from("31-12-2024 12:00"),
+            );
+
+            set_caller(bob);
+
+            let _ = contrato.registrarse(String::from("Bob"), String::from("Bob"), String::from("Bob"));
+
+            set_caller(administrador);
+
+            let _ = contrato.procesar_siguiente_usuario_pendiente(true);
+
+            set_caller(bob);
+
+            let _ = contrato.ingresar_a_eleccion_privado(1, TIPO_DE_USUARIO::CANDIDATO);
+
+            set_caller(administrador);
+
+            let _ = contrato.procesar_usuarios_en_una_eleccion_privado(1, true);
+
+            set_caller(bob);
+
+            // El código de arriba simúla la activación del registro, creación de una elección, registro de una persona, 
+            // aceptación del registro de una persona, registro de una persona a una elección y aceptación de ese registro en la elección
+
+            let res = contrato.obtener_informacion_candidato_eleccion(1, 1);
+            assert!(res.is_ok()); // Se obtiene la información del candidato porque existe la elección y existe el candidato
+
+            let res = contrato.obtener_informacion_candidato_eleccion(2, 1);
+            assert!(res.is_err()); // No se obtiene la información porque la elección no existe
+
+            let res = contrato.obtener_informacion_candidato_eleccion(1, 2);
+            assert!(res.is_err()); // No se obtiene la información porque el candidato no existe
         }
 
         #[test]
-        fn test_procesar_siguiente_usuario_pendiente_eleccion() {
+        fn test_procesar_siguiente_usuario_pendiente_eleccion() 
+        {
             let mut eleccion = setup_eleccion();
             let accounts = default_accounts::<DefaultEnvironment>();
     
@@ -1122,150 +1198,131 @@ mod TrabajoFinal {
         }
 
         #[test]
-	fn test_votar_a_candidato_privado() {
-		let accounts = get_default_test_accounts();
-		let alice = accounts.alice;
-		let charlie = accounts.charlie;
-		let bob = accounts.bob;
+        fn test_votar_a_candidato_privado() 
+        {
+            let accounts = get_default_test_accounts();
+            let alice = accounts.alice;
+            let charlie = accounts.charlie;
+            let bob = accounts.bob;
 
-		set_caller(alice);
-		let mut contrato = TrabajoFinal::new();
-		let nueva_eleccion = contrato.crear_eleccion_privado(
+            set_caller(alice);
+            let mut contrato = TrabajoFinal::new();
+            let nueva_eleccion = contrato.crear_eleccion_privado(
                 String::from("01-07-2024 12:00"),
                 String::from("31-12-2024 12:00"),
-		);
-		assert_eq!(nueva_eleccion, Ok(format!("Eleccion creada exitosamente. Id de la elección: 1")) );
-		contrato.activar_registro_privado();
+            );
+            assert_eq!(nueva_eleccion, Ok(format!("Eleccion creada exitosamente. Id de la elección: 1")) );
+            contrato.activar_registro_privado();
 
-		// Usuarios se registran
-		set_caller(bob);
-		let result = contrato.registrarse_privado("Bob".to_string(), "Asd".to_string(), "12345678".to_string() );
-		assert_eq!(result, Ok("Registro exitoso. Se te añadió en la cola de usuarios pendientes.".to_string()) );
-		set_caller(charlie);
-		contrato.registrarse_privado("Charlie".to_string(), "Dsa".to_string(), "87654321".to_string() );
-		assert_eq!(result, Ok("Registro exitoso. Se te añadió en la cola de usuarios pendientes.".to_string()) );
+            // Usuarios se registran
+            set_caller(bob);
+            let result = contrato.registrarse_privado("Bob".to_string(), "Asd".to_string(), "12345678".to_string() );
+            assert_eq!(result, Ok("Registro exitoso. Se te añadió en la cola de usuarios pendientes.".to_string()) );
+            set_caller(charlie);
+            contrato.registrarse_privado("Charlie".to_string(), "Dsa".to_string(), "87654321".to_string() );
+            assert_eq!(result, Ok("Registro exitoso. Se te añadió en la cola de usuarios pendientes.".to_string()) );
 
-		// Alice aprueba registro en sistema
-		set_caller(alice);
-		contrato.procesar_siguiente_usuario_pendiente_privado(true);
-		contrato.procesar_siguiente_usuario_pendiente_privado(true);
-	
-		// Usuarios se registran en eleccion
-		set_caller(bob);
-		contrato.ingresar_a_eleccion_privado(1, TIPO_DE_USUARIO::CANDIDATO);
-		set_caller(charlie);
-		contrato.ingresar_a_eleccion_privado(1, TIPO_DE_USUARIO::VOTANTE);
+            // Alice aprueba registro en sistema
+            set_caller(alice);
+            contrato.procesar_siguiente_usuario_pendiente_privado(true);
+            contrato.procesar_siguiente_usuario_pendiente_privado(true);
+        
+            // Usuarios se registran en eleccion
+            set_caller(bob);
+            contrato.ingresar_a_eleccion_privado(1, TIPO_DE_USUARIO::CANDIDATO);
+            set_caller(charlie);
+            contrato.ingresar_a_eleccion_privado(1, TIPO_DE_USUARIO::VOTANTE);
 
-		set_caller(alice);
-		let result = contrato.procesar_usuarios_en_una_eleccion_privado(1, true);
-		assert_eq!(result, Ok(String::from("Usuario agregado exitosamente.")));
-		let result = contrato.procesar_usuarios_en_una_eleccion_privado(1, true);
-		assert_eq!(result, Ok(String::from("Usuario agregado exitosamente.")));
+            set_caller(alice);
+            let result = contrato.procesar_usuarios_en_una_eleccion_privado(1, true);
+            assert_eq!(result, Ok(String::from("Usuario agregado exitosamente.")));
+            let result = contrato.procesar_usuarios_en_una_eleccion_privado(1, true);
+            assert_eq!(result, Ok(String::from("Usuario agregado exitosamente.")));
 
-		// Vota en eleccion usuario no registrado
-		set_caller(alice);
-                let result = contrato.votar_a_candidato_privado(1, 1);
-                assert_eq!(result, Err(String::from("No estás registrado en el sistema. Espera a que te acepten en el mismo o realiza la solicitud.")) );
+            // Vota en eleccion usuario no registrado
+            set_caller(alice);
+            let result = contrato.votar_a_candidato_privado(1, 1);
+            assert_eq!(result, Err(String::from("No estás registrado en el sistema. Espera a que te acepten en el mismo o realiza la solicitud.")) );
 
-		set_caller(charlie);
-		// Vota en eleccion que todavia no inicio
-                let result = contrato.votar_a_candidato_privado(1, 1);
-                assert_eq!(result, Err(String::from("Todavía no es la fecha para la votación.")) );
+            set_caller(charlie);
+            // Vota en eleccion que todavia no inicio
+            let result = contrato.votar_a_candidato_privado(1, 1);
+            assert_eq!(result, Err(String::from("Todavía no es la fecha para la votación.")) );
 
-		contrato.elecciones[0].votacion_iniciada = true;
-                // Voto a candidato inexistente
-                let result = contrato.votar_a_candidato_privado(1, 2);
-                assert_eq!(result, Err(String::from("No existe un candidato con este id.")) );
+            contrato.elecciones[0].votacion_iniciada = true;
+            // Voto a candidato inexistente
+            let result = contrato.votar_a_candidato_privado(1, 2);
+            assert_eq!(result, Err(String::from("No existe un candidato con este id.")) );
 
-		// Voto exitoso
-		let result = contrato.votar_a_candidato_privado(1, 1);
-		assert_eq!(result, Ok(String::from("Voto emitido exitosamente.")));
+            // Voto exitoso
+            let result = contrato.votar_a_candidato_privado(1, 1);
+            assert_eq!(result, Ok(String::from("Voto emitido exitosamente.")));
 
-		// Volver a votar en una eleccion que ya voto
-                let result = contrato.votar_a_candidato_privado(1, 1);
-                assert_eq!(result, Err("No se realizó el voto porque ya votaste anteriormente.".to_string() ));
+            // Volver a votar en una eleccion que ya voto
+            let result = contrato.votar_a_candidato_privado(1, 1);
+            assert_eq!(result, Err("No se realizó el voto porque ya votaste anteriormente.".to_string() ));
 
-		// Vota eleccion inexistente
-                let result = contrato.votar_a_candidato_privado(7, 1);
-                assert_eq!(result, Err(String::from("No existe una elección con ese id.")) );
-		
-		// Usuario no registrado como votante trata de votar
-		set_caller(bob);
-		let result = contrato.votar_a_candidato_privado(1, 1);
-		assert_eq!(result, Err(String::from("No estás registrado en la elección.")) );
-	}
+            // Vota eleccion inexistente
+            let result = contrato.votar_a_candidato_privado(7, 1);
+            assert_eq!(result, Err(String::from("No existe una elección con ese id.")) );
+            
+            // Usuario no registrado como votante trata de votar
+            set_caller(bob);
+            let result = contrato.votar_a_candidato_privado(1, 1);
+            assert_eq!(result, Err(String::from("No estás registrado en la elección.")) );
+        }
 
-	#[test]
-	fn test_obtener_informacion_siguiente_usuario_pendiente_privado() {
-        let accounts = get_default_test_accounts();
-        let alice = accounts.alice;
-        let charlie = accounts.charlie;
-        let bob = accounts.bob;
+        #[test]
+        fn test_obtener_informacion_siguiente_usuario_pendiente_privado() {
+            let accounts = get_default_test_accounts();
+            let alice = accounts.alice;
+            let charlie = accounts.charlie;
+            let bob = accounts.bob;
 
-        set_caller(alice);
-        let mut contrato = TrabajoFinal::new();
-		contrato.activar_registro_privado();
-		let result = contrato.obtener_informacion_siguiente_usuario_pendiente();
-		assert_eq!(result, Err(String::from("No hay usuarios pendientes.")) );
-		
-		set_caller(bob);
-		let result = contrato.registrarse_privado("Bob".to_string(), "Asd".to_string(), "12345678".to_string() );
-		assert_eq!(contrato.usuarios_pendientes.len(), 1);
-		
-		set_caller(alice);
-		let result = contrato.obtener_informacion_siguiente_usuario_pendiente();
-		let string_bob = "Nombre: Bob\nApellido: Asd\nDNI: 12345678".to_string();
-		assert_eq!(result, Ok(string_bob) );
+            set_caller(alice);
+            let mut contrato = TrabajoFinal::new();
+            contrato.activar_registro_privado();
+            let result = contrato.obtener_informacion_siguiente_usuario_pendiente();
+            assert_eq!(result, Err(String::from("No hay usuarios pendientes.")) );
+            
+            set_caller(bob);
+            let result = contrato.registrarse_privado("Bob".to_string(), "Asd".to_string(), "12345678".to_string() );
+            assert_eq!(contrato.usuarios_pendientes.len(), 1);
+            
+            set_caller(alice);
+            let result = contrato.obtener_informacion_siguiente_usuario_pendiente();
+            let string_bob = "Nombre: Bob\nApellido: Asd\nDNI: 12345678".to_string();
+            assert_eq!(result, Ok(string_bob) );
 
-		set_caller(charlie);
-		let result = contrato.registrarse_privado("Charlie".to_string(), "Asd".to_string(), "12345678".to_string() );
-		assert_eq!(contrato.usuarios_pendientes.len(), 2);
+            set_caller(charlie);
+            let result = contrato.registrarse_privado("Charlie".to_string(), "Asd".to_string(), "12345678".to_string() );
+            assert_eq!(contrato.usuarios_pendientes.len(), 2);
 
-		set_caller(alice);
-		// Aprobamos a Bob para ver la informacion de Charlie
-		contrato.procesar_siguiente_usuario_pendiente_privado(true);
+            set_caller(alice);
+            // Aprobamos a Bob para ver la informacion de Charlie
+            contrato.procesar_siguiente_usuario_pendiente_privado(true);
 
-        let result = contrato.obtener_informacion_siguiente_usuario_pendiente();
-        let string_charlie = "Nombre: Charlie\nApellido: Asd\nDNI: 12345678".to_string();
-        assert_eq!(result, Ok(string_charlie) );
+            let result = contrato.obtener_informacion_siguiente_usuario_pendiente();
+            let string_charlie = "Nombre: Charlie\nApellido: Asd\nDNI: 12345678".to_string();
+            assert_eq!(result, Ok(string_charlie) );
 
-		// Aprobamos a todos los usuarios pendientes y volvemos a consultar
-		contrato.procesar_siguiente_usuario_pendiente_privado(true);
-        let result = contrato.obtener_informacion_siguiente_usuario_pendiente();
-        assert_eq!(result, Err(String::from("No hay usuarios pendientes.")) );
-	}
+            // Aprobamos a todos los usuarios pendientes y volvemos a consultar
+            contrato.procesar_siguiente_usuario_pendiente_privado(true);
+            let result = contrato.obtener_informacion_siguiente_usuario_pendiente();
+            assert_eq!(result, Err(String::from("No hay usuarios pendientes.")) );
+        }
+
         // ====================== FIN TESTS ELECCION ======================
         // ====================== FIN TESTS ELECCION ======================
         // ====================== FIN TESTS ELECCION ======================
     
-    
-        
-        fn crear_usuario(id: AccountId, nombre: &str, apellido: &str, dni: &str) -> Usuario {
-            Usuario {
-                id,
-                nombre: nombre.to_string(),
-                apellido: apellido.to_string(),
-                dni: dni.to_string(),
-            }
-        }
-        fn crear_trabajo_final(administrador: AccountId) -> TrabajoFinal {
-            TrabajoFinal {
-                administrador,
-                generador_reportes: None,
-                registro_activado: false,
-                usuarios: Vec::new(),
-                usuarios_pendientes: Vec::new(),
-                usuarios_rechazados: Vec::new(),
-                elecciones: Vec::new(),
-            }
-        }
-        
         // ====================== INICIO TESTS SISTEMA ELECCIONES ======================
         // ====================== INICIO TESTS SISTEMA ELECCIONES ======================
         // ====================== INICIO TESTS SISTEMA ELECCIONES ======================
         
         #[test]
-        fn test_constructor() {
+        fn test_constructor() 
+        {
             let accounts = get_default_test_accounts();
             let alice = accounts.alice;
             let charlie = accounts.charlie;
@@ -1276,8 +1333,10 @@ mod TrabajoFinal {
             assert_eq!(sistema_elecciones.administrador, alice);
             assert_ne!(sistema_elecciones.administrador, charlie);
         }
+
         #[ink::test]
-        fn test_obtener_informacion_candidato_eleccion() {
+        fn test_obtener_informacion_candidato_eleccion() 
+        {
             let mut eleccion = setup_eleccion();
             let accounts = default_accounts::<DefaultEnvironment>();
             eleccion.candidatos.push(CandidatoConteo {
@@ -1302,8 +1361,10 @@ mod TrabajoFinal {
             let candidato_info = eleccion.obtener_informacion_candidato(3);
             assert!(candidato_info.is_none());
         }
+
         #[test]
-        fn test_obtener_informacion_siguiente_usuario_pendiente() {
+        fn test_obtener_informacion_siguiente_usuario_pendiente() 
+        {
             let administrador: AccountId = AccountId::from([0x1; 32]);
             let otro_usuario: AccountId = AccountId::from([0x2; 32]);
             set_caller(administrador);
@@ -1323,8 +1384,10 @@ mod TrabajoFinal {
             let result = contrato.obtener_informacion_siguiente_usuario_pendiente();
             assert!(result.is_ok_and(|info| info == str));
         }
+
         #[test]
-        fn test_transferir_administrador() {
+        fn test_transferir_administrador() 
+        {
             let accounts = get_default_test_accounts();
             let alice = accounts.alice;
             let charlie = accounts.charlie;
@@ -1346,7 +1409,8 @@ mod TrabajoFinal {
         }
 
         #[ink::test]
-        fn test_obtener_candidatos_eleccion_por_id(){
+        fn test_obtener_candidatos_eleccion_por_id()
+        {
             let administrador: AccountId = AccountId::from([0x1; 32]);
             let generador_reportes: AccountId = AccountId::from([0x2; 32]);
             set_caller(administrador);
@@ -1370,7 +1434,8 @@ mod TrabajoFinal {
         }
     
         #[ink::test]
-        fn test_obtener_usuario() {
+        fn test_obtener_usuario() 
+        {
             let accounts = get_default_test_accounts();
             let id: AccountId = accounts.alice;
             let mut trabajo_final = TrabajoFinal::new();
@@ -1386,7 +1451,8 @@ mod TrabajoFinal {
         }
     
         #[ink::test]
-        fn test_es_usuario_registrado() {
+        fn test_es_usuario_registrado() 
+        {
             let accounts = get_default_test_accounts();
             let id: AccountId = accounts.alice;
             let mut trabajo_final = TrabajoFinal::new();
@@ -1397,7 +1463,8 @@ mod TrabajoFinal {
         }
     
         #[ink::test]
-        fn test_es_usuario_pendiente() {
+        fn test_es_usuario_pendiente() 
+        {
             let accounts = get_default_test_accounts();
             let id: AccountId = accounts.alice;
             let mut trabajo_final = TrabajoFinal::new();
@@ -1408,7 +1475,8 @@ mod TrabajoFinal {
         }
     
         #[test]
-        fn test_existe_eleccion() {
+        fn test_existe_eleccion() 
+        {
             let id: AccountId = [0; 32].into();
             let mut trabajo_final = crear_trabajo_final(id);
             let eleccion = setup_eleccion();
@@ -1419,7 +1487,8 @@ mod TrabajoFinal {
         }
     
         #[test]
-        fn test_obtener_eleccion_por_id() {
+        fn test_obtener_eleccion_por_id() 
+        {
             let id: AccountId = [0; 32].into();
             let mut trabajo_final = crear_trabajo_final(id);
             let eleccion = setup_eleccion();
@@ -1435,7 +1504,8 @@ mod TrabajoFinal {
 
 
         #[ink::test]
-        fn test_activar_registro() {
+        fn test_activar_registro() 
+        {
             let mut contract = TrabajoFinal::new();
 
             let res = contract.activar_registro_privado();
@@ -1447,7 +1517,8 @@ mod TrabajoFinal {
         }
 
         #[ink::test]
-        fn test_registro_usuario() {
+        fn test_registro_usuario() 
+        {
             let administrador: AccountId = AccountId::from([0x1; 32]);
             let otro_usuario: AccountId = AccountId::from([0x2; 32]);
 
@@ -1463,7 +1534,8 @@ mod TrabajoFinal {
         }
 
         #[ink::test]
-        fn test_obtener_ref_eleccion_por_id() {
+        fn test_obtener_ref_eleccion_por_id() 
+        {
             let mut contrato = TrabajoFinal::new();
 
             let candidato1 = CandidatoConteo {
@@ -1523,7 +1595,8 @@ mod TrabajoFinal {
         }
 
         #[ink::test]
-        fn test_validar_estado_eleccion() {
+        fn test_validar_estado_eleccion() 
+        {
             let mut contrato = TrabajoFinal::new();
             let usuario_id = AccountId::from([0x01; 32]);
             
@@ -1595,7 +1668,8 @@ mod TrabajoFinal {
         }
 
         #[ink::test]
-        fn test_crear_eleccion() {
+        fn test_crear_eleccion() 
+        {
             // Instanciar el contrato
             let mut contrato = TrabajoFinal::new();
     
@@ -1643,7 +1717,8 @@ mod TrabajoFinal {
         }
 
         #[ink::test]
-        fn test_procesar_usuarios_en_una_eleccion() {
+        fn test_procesar_usuarios_en_una_eleccion() 
+        {
             let mut contrato = TrabajoFinal::new();
             let accounts = default_accounts::<DefaultEnvironment>();
             
@@ -1674,9 +1749,9 @@ mod TrabajoFinal {
             assert_eq!(result, Err(String::from("Eleccion no encontrada")));
         } 
 
-
         #[ink::test]
-        fn test_ingresar_a_eleccion() {
+        fn test_ingresar_a_eleccion() 
+        {
             let accounts = get_default_test_accounts();
             let alice = accounts.alice;
             let charlie = accounts.charlie;
@@ -1717,8 +1792,9 @@ mod TrabajoFinal {
 
         }
 
-            #[ink::test]
-        fn test_iniciar_votacion_privado() {
+        #[ink::test]
+        fn test_iniciar_votacion_privado() 
+        {
             let accounts = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>();
 
             // Crear el contrato con el administrador
@@ -1783,8 +1859,10 @@ mod TrabajoFinal {
             );
             assert!(contrato.elecciones[0].votacion_iniciada);
         }
+
         #[ink::test]
-        fn test_obtener_siguiente_usuario_pendiente_en_una_eleccion_privado_exito_VOTANTE() {
+        fn test_obtener_siguiente_usuario_pendiente_en_una_eleccion_privado_exito_VOTANTE() 
+        {
             let mut contrato = TrabajoFinal::new();
             let id_administrador = AccountId::from([1; 32]); 
             let id_usuario = AccountId::from([2; 32]);
@@ -1819,7 +1897,8 @@ mod TrabajoFinal {
         }
 
         #[ink::test]
-        fn test_obtener_siguiente_usuario_pendiente_en_una_eleccion_privado_exito_CANDIDATO() {
+        fn test_obtener_siguiente_usuario_pendiente_en_una_eleccion_privado_exito_CANDIDATO() 
+        {
             let mut contrato = TrabajoFinal::new();
             let id_administrador = AccountId::from([1; 32]); 
             let id_usuario = AccountId::from([2; 32]);
@@ -1855,7 +1934,8 @@ mod TrabajoFinal {
 
 
         #[ink::test]
-        fn test_obtener_siguiente_usuario_pendiente_en_una_eleccion_privado_fallo_eleccion_inexistente() {
+        fn test_obtener_siguiente_usuario_pendiente_en_una_eleccion_privado_fallo_eleccion_inexistente()
+        {
             let mut contrato = TrabajoFinal::new();
             let id_administrador = AccountId::from([1; 32]);
             let id_usuario = AccountId::from([2; 32]);
@@ -1884,7 +1964,8 @@ mod TrabajoFinal {
         }
 
         #[ink::test]
-        fn test_obtener_siguiente_usuario_pendiente_en_una_eleccion_privado_fallo_sin_usuarios_pendientes() {
+        fn test_obtener_siguiente_usuario_pendiente_en_una_eleccion_privado_fallo_sin_usuarios_pendientes() 
+        {
             // Configuración inicial del contrato y del contexto de prueba
             let mut contrato = TrabajoFinal::new();
             let id_administrador = AccountId::from([1; 32]); // Ejemplo de ID de administrador
@@ -1911,10 +1992,6 @@ mod TrabajoFinal {
             // Verificar el resultado esperado
             assert!(result_obtener.is_err(), "Se esperaba un error al obtener el siguiente usuario pendiente en la elección (ningún usuario pendiente)");
         }
+        
     }
-
 }    
-
-
-
-
