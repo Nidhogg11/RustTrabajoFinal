@@ -157,12 +157,13 @@ mod Reporte {
     #[cfg(all(test, feature = "e2e-tests"))]
     mod e2e_tests {
         use super::*;
-        // use ink_e2e::*;
+        // use ink_e2e::Client;
 
         type E2EResult<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
-        #[ink_e2e::test]
-        async fn e2e_Reporte<Client: E2EBackend>(mut client: Client) -> E2EResult<()> {
+        async fn e2e_Reporte<C: ink_e2e::subxt::Config, E: ink_env::Environment>(
+            mut client: ink_e2e::Client<C, E>,
+        ) -> E2EResult<()> {
             // given
             let trabajo_final_hash = client
                 .upload("TrabajoFinal", &ink_e2e::alice(), None)
