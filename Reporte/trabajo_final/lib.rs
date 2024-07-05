@@ -259,6 +259,7 @@ mod TrabajoFinal {
             eleccion_id >= 1 && eleccion_id <= self.elecciones.len() as u64
         }
 
+        /// Busca una eleccion por Id
         fn obtener_eleccion_por_id(&mut self, eleccion_id:u64) -> Option<&mut Eleccion>
         {
             if self.existe_eleccion(eleccion_id) {
@@ -269,7 +270,7 @@ mod TrabajoFinal {
             }
             return None;
         }
-
+        
         fn obtener_ref_eleccion_por_id(&self, eleccion_id:u64) -> Option<&Eleccion>
         {
             if self.existe_eleccion(eleccion_id) {
@@ -577,7 +578,8 @@ mod TrabajoFinal {
             }
         }
 
-        /// FALTA DOCUMENTACIÓN
+        /// Utilizada por cualquier tipo de usuario.
+        /// Devuelve los datos de un candidado en particular en una eleccion especifica.
         #[ink(message)]
         pub fn obtener_informacion_candidato_eleccion(&self, eleccion_id:u64, candidato_id:u32) -> Result<String, String>
         {
@@ -667,7 +669,8 @@ mod TrabajoFinal {
         // ====-----==== METODOS PARA EL GENERADOR DE REPORTES ====----====
         // ====-----==== METODOS PARA EL GENERADOR DE REPORTES ====----====
 
-        /// FALTA DOCUMENTACIÓN
+        /// Utilizado por el generador de reportes asignado por el administrador.
+        /// Obtiene la informacion del usuario especificado por AccountId
         #[ink(message)]
         pub fn obtener_informacion_usuario(&self, user_id: AccountId) -> Option<(String, String, String)> 
         {
@@ -684,7 +687,10 @@ mod TrabajoFinal {
             }
         }
 
-        /// FALTA DOCUMENTACIÓN
+        /// Utilizado por el generador de reportes asignado por el administrador.
+        /// Cuando una elección especificada por parametro ya finalizó, el generador de reportes puede obtener un vector con 
+        /// todos los votantes y si emitieron el voto o no.
+        /// Si la eleccion no existe devuelve "La eleccion enviada no existe!"
         #[ink(message)]
         pub fn obtener_votantes_eleccion_por_id(&mut self, eleccion_id: u64) -> Result<Vec<(AccountId,bool)>, String>
         {
@@ -708,7 +714,10 @@ mod TrabajoFinal {
             }
         }
 
-        /// FALTA DOCUMENTACIÓN
+         /// Utilizado por el generador de reportes asignado por el administrador.
+         /// Cuando una elección especificada por parametro ya finalizó, el generador de reportes puede obtener un vector con 
+        /// todos los candidatos y los votos totales que obtivieron.
+        /// Si la eleccion no existe devuelve "La eleccion enviada no existe!"
         #[ink(message)]
         pub fn obtener_candidatos_eleccion_por_id(&mut self, eleccion_id: u64) -> Result<Vec<(AccountId,u32)>, String>
         {
