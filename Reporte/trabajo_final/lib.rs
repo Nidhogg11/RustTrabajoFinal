@@ -107,20 +107,15 @@ mod TrabajoFinal {
                 Some(index) => Some(&self.candidatos[index])
             }
         }
-    /*
-    Permite a un votante registrado en una elección emitir su voto hacia un candidato específico.
-    Verifica la existencia del candidato y asegura que el votante no haya votado previamente en la misma elección.
-    
-    Parámetros
-        votante_id (AccountId): Identificador único del votante que emite el voto.
-        candidato_id (u32): Identificador del candidato hacia el cual se emite el voto.
-
-    Retorno
-    Result<String, String>:
-        Ok("Voto emitido exitosamente."): Si el voto se emitió con éxito hacia el candidato especificado.
-        Err("Mensaje de error"): Si ocurre algún error durante el proceso de votación, como la falta de existencia del candidato,
-        intento de votar más de una vez, o un desbordamiento al incrementar el contador de votos del candidato.
-    */
+        /// Permite a un votante registrado emitir su voto por un candidato en la elección actual.
+        /// - votante_id: AccountId del votante que desea votar.
+        /// - candidato_id: Identificador único del candidato por el cual se desea emitir el voto.
+        /// Descripción:
+        /// Verifica si el candidato existe. Si no existe, retorna un error.
+        /// Verifica si el votante está registrado en la elección. Si no lo está, retorna un error.
+        /// Verifica si el votante ya ha emitido su voto. Si ya lo hizo, retorna un error.
+        /// Registra el voto del votante por el candidato especificado y actualiza los conteos.
+        /// Retorna un mensaje de éxito si el voto se emitió correctamente.
         pub fn votar_candidato(&mut self, votante_id:AccountId, candidato_id:u32) -> Result<String, String>
         {
             if !self.existe_candidato(candidato_id) { return Err(String::from("No existe un candidato con este id.")); }
@@ -149,9 +144,14 @@ mod TrabajoFinal {
         }
 
         /// Usado por el administrador.
-        /// Revisa el primer usuario pendiente.
-        /// Lo envia al Vec candidato si es candidato, o votante en caso contrario.
-        /// Agrega votantes o candidatos al sistema y gestiona errores de desbordamiento para las IDs de candidatos.
+        /// Procesa el siguiente usuario pendiente, aceptándolo o rechazándolo según el parámetro aceptar_usuario.
+        /// - aceptar_usuario: bool - Indica si se acepta (true) o se rechaza (false) al usuario pendiente.
+        /// Result<String, String>: Mensaje de éxito indicando si el usuario fue agregado o rechazado correctamente, o un mensaje de error si no hay usuarios pendientes.
+        /// Descripción:
+        /// Verifica si hay usuarios pendientes. Si no hay, retorna un error indicando que no hay usuarios pendientes.
+        /// Si se acepta al usuario, lo añade a la lista correspondiente (votantes o candidatos) según su tipo. Retorna un mensaje de éxito indicando la operación realizada.
+        /// Si se rechaza al usuario, lo añade a la lista de usuarios rechazados. Retorna un mensaje de éxito indicando que el usuario fue rechazado.
+
         pub fn procesar_siguiente_usuario_pendiente(&mut self, aceptar_usuario:bool) -> Result<String, String>
         {
             let sig_usuario = self.usuarios_pendientes.first();
@@ -187,16 +187,15 @@ mod TrabajoFinal {
                 return Ok(String::from("Usuario rechazado exitosamente."));
             }
         }
-        /*
-    Calcula y devuelve los resultados de la votación de una elección si la fecha final de la votación es anterior al block_timestamp.
-    Parámetros
-        block_timestamp (u64): El timestamp del bloque en el que se desea obtener los resultados de la votación.
-
-    Retorno
-    Option<&Resultados>:
-        Some(resultados): Una referencia a la estructura Resultados que contiene los resultados de la votación si la fecha final de la votación es anterior al block_timestamp y los resultados están disponibles.
-        None: Si la fecha final de la votación es posterior al block_timestamp, indicando que los resultados aún no están disponibles.
-         */
+        /// Obtiene los resultados de la votación si están disponibles.
+        /// - block_timestamp: u64 - Marca de tiempo del bloque para verificar si ya se pueden obtener los resultados.
+        /// Retorno:
+        /// Option<&Resultados>: Resultados de la votación si están disponibles, o None si no lo están.
+        /// Descripción:
+        /// Verifica si la fecha final de la elección es mayor que el block_timestamp. Si es así, retorna None ya que los resultados aún no están disponibles.
+        /// Si self.resultados tiene algún valor, devuelve una referencia a esos resultados.
+        /// Si no hay resultados previos, calcula los resultados contando los votos totales y realizados de los votantes, y los votos totales de cada candidato.
+ 
         fn obtener_resultados_votacion(&mut self, block_timestamp:u64) -> Option<&Resultados>
         {
             if self.fecha_final > block_timestamp {
@@ -285,17 +284,14 @@ mod TrabajoFinal {
             eleccion_id >= 1 && eleccion_id <= self.elecciones.len() as u64
         }
 
-        /*
-    Devuelve una referencia mutable a la estructura Eleccion correspondiente al ID de elección dado por parametro, 
-    permitiendo realizar modificaciones en la elección si existe en la lista de elecciones del sistema.
-    Parámetros
-        eleccion_id (u64): El ID de la elección que se desea obtener.
+        /// Obtiene una referencia mutable a una elección por su ID.
+        /// - eleccion_id: u64 - ID de la elección a obtener.
+        /// Option<&mut Eleccion>: Referencia mutable a la elección si existe, o None si no se encuentra.
+        /// Descripción:
+        /// Verifica si existe una elección con el ID proporcionado utilizando el método existe_eleccion().
+        /// Si la elección existe, calcula el índice válido (ajustado para el acceso a vector) y retorna una referencia mutable a la elección.
+        /// Retorna None si no se encuentra ninguna elección con el ID especificado.
 
-    Retorno
-    Option<&mut Eleccion>:
-        Some(eleccion): Una referencia mutable a la estructura Eleccion si se encuentra una elección con el ID especificado.
-        None: Si no existe una elección con el ID proporcionado.
-     */
         fn obtener_eleccion_por_id(&mut self, eleccion_id:u64) -> Option<&mut Eleccion>
         {
             if self.existe_eleccion(eleccion_id) {
@@ -306,17 +302,13 @@ mod TrabajoFinal {
             }
             return None;
         }
-    /*
-    Devuelve una referencia inmutable a la estructura Eleccion correspondiente al ID de elección dado por parametro, 
-    si existe en la lista de elecciones del sistema.
-    Parámetros
-        eleccion_id (u64): El ID de la elección que se desea obtener.
-
-    Retorno
-    Option<&Eleccion>:
-        Some(eleccion): Una referencia inmutable a la estructura Eleccion si se encuentra una elección con el ID especificado.
-        None: Si no existe una elección con el ID proporcionado.
-     */
+        /// Obtiene una referencia inmutable a una elección por su ID.
+        /// - eleccion_id: u64 - ID de la elección a obtener.
+        /// Option<&Eleccion>: Referencia inmutable a la elección si existe, o None si no se encuentra.
+        /// Descripción:
+        /// Verifica si existe una elección con el ID proporcionado utilizando el método existe_eleccion().
+        /// Si la elección existe, calcula el índice válido (ajustado para el acceso a vector) y retorna una referencia inmutable a la elección.
+        /// Retorna None si no se encuentra ninguna elección con el ID especificado.
         fn obtener_ref_eleccion_por_id(&self, eleccion_id:u64) -> Option<&Eleccion>
         {
             if self.existe_eleccion(eleccion_id) {
@@ -327,21 +319,18 @@ mod TrabajoFinal {
             }
             return None;
         }
-        /*
-    Ayuda a validar el estado de una elección antes de permitir que un usuario se registre en ella como votante o candidato.
-    Parámetros
-        eleccion_id (u64): El ID de la elección que se desea validar.
-        block_timestamp (u64): El timestamp actual del bloque de la cadena de bloques.
-        id_usuario (AccountId): El ID del usuario que desea registrarse en la elección.
+        /// Valida el estado de una elección antes de permitir que un usuario se registre en ella.
+        /// - eleccion_id: u64 - ID de la elección a validar.
+        /// - block_timestamp: u64 - Timestamp del bloque actual.
+        /// - id_usuario: AccountId - ID del usuario que desea registrarse en la elección.
+        /// Result<&mut Eleccion, String>: Referencia mutable a la elección válida o mensaje de error.
+        /// Descripción:
+        /// Verifica si existe una elección con el ID proporcionado. Si no existe, retorna un error indicando que no existe una elección con ese ID.
+        /// Obtiene la elección y verifica si el usuario ya está registrado como pendiente en ella. Si lo está, retorna un error indicando que ya está registrado en la elección.
+        /// Verifica si la votación en la elección ya ha iniciado o si la fecha de inicio es menor al timestamp del bloque actual. Si es así, retorna un error indicando que la votación ya comenzó y no se puede registrar.
+        /// Verifica si la fecha de finalización de la elección es menor al timestamp del bloque actual. Si es así, retorna un error indicando que la elección ya finalizó y no se puede registrar.
+        /// Retorna una referencia mutable a la elección válida si todas las validaciones pasan.
 
-    Retorno
-        Result<&mut Eleccion, String>:
-            Ok(eleccion): Una referencia mutable a la estructura Eleccion si la validación es exitosa y el usuario puede registrarse en la elección.
-            Err("No existe una elección con ese id."): Si no existe una elección con el ID especificado.
-            Err("Ya está registrado en la elección."): Si el usuario ya está registrado o pendiente en la elección.
-            Err("La votación en la elección ya comenzó, no te puedes registrar."): Si la votación en la elección ya inició y el usuario no puede registrarse.
-            Err("La elección ya finalizó, no te puedes registrar."): Si la elección ya finalizó y el usuario no puede registrarse.
-         */
         fn validar_estado_eleccion(&mut self,eleccion_id:u64,block_timestamp:u64,id_usuario:AccountId) -> Result<&mut Eleccion,String>
         {
             let option_eleccion = self.obtener_eleccion_por_id(eleccion_id);
@@ -363,23 +352,19 @@ mod TrabajoFinal {
         // ====-----==== METODOS PÚBLICOS ====----====
         // ====-----==== METODOS PÚBLICOS ====----====
 
-    /*
-    Permite a un usuario no registrado solicitar su registro en el sistema, proporcionando su nombre, apellido y número de documento (DNI).
     
-    Parámetros
-        nombre (String): El nombre del usuario que desea registrarse.
-        apellido (String): El apellido del usuario que desea registrarse.
-        dni (String): El número de documento del usuario que desea registrarse.
-
-    Retorno
-    Result<String, String>:
-        Ok("Registro exitoso. Se te añadió en la cola de usuarios pendientes."): Si el registro se realiza correctamente y el usuario se añade a la cola de usuarios pendientes para revisión administrativa.
-        Err("El registro todavía no está activado."): Si el registro no está activado en el sistema.
-        Err("Eres el administrador, no puedes registrarte."): Si quien intenta registrarse es el administrador del sistema.
-        Err("Tu solicitud de registro ya fue rechazada."): Si el usuario ya había sido rechazado previamente y no puede volver a solicitar registro.
-        Err("Ya estás registrado como usuario."): Si el usuario ya está registrado en el sistema.
-        Err("Ya estás en la cola de usuarios pendientes."): Si el usuario ya está en la cola de usuarios pendientes para revisión.
-    */
+        /// Registra un nuevo usuario en el sistema.
+        /// - nombre: String - Nombre del usuario a registrar.
+        /// - apellido: String - Apellido del usuario a registrar.
+        /// - dni: String - DNI del usuario a registrar.
+        /// Descripción:
+        /// Verifica si el registro está activado. Si no lo está, retorna un error indicando que el registro no está activado.
+        /// Verifica si el llamador es el administrador. Si es así, retorna un error indicando que el administrador no puede registrarse.
+        /// Verifica si el llamador ya ha sido rechazado anteriormente. Si es así, retorna un error indicando que la solicitud de registro ya fue rechazada.
+        /// Verifica si el llamador ya está registrado como usuario. Si es así, retorna un error indicando que ya está registrado.
+        /// Verifica si el llamador ya está en la cola de usuarios pendientes. Si es así, retorna un error indicando que ya está en la cola de usuarios pendientes.
+        /// Registra al usuario añadiéndolo a la cola de usuarios pendientes y retorna un mensaje de éxito.
+  
         #[ink(message)]
         pub fn registrarse(&mut self, nombre:String, apellido:String, dni:String) -> Result<String, String>
         {
@@ -408,15 +393,14 @@ mod TrabajoFinal {
         
         // ====-----==== METODOS ADMINISTRADOR ====----====
 
-        /*
-    Permite al administrador obtener la información del próximo usuario pendiente en la lista de usuarios pendientes del sistema.
-    
-    Retorno
-        Result<String, String>:
-            Ok("Nombre: {nombre}\nApellido: {apellido}\nDNI: {dni}"): Si la información del próximo usuario pendiente se obtiene correctamente.
-            Err("No hay usuarios pendientes."): Si no hay usuarios pendientes en el sistema.
-            Err("No es administrador."): Si quien llama a la función no es un administrador.
-         */
+        /// Obtiene la información del siguiente usuario pendiente en la lista.
+        /// Result<String, String>: Mensaje de éxito con la información del usuario o error si no hay usuarios pendientes.
+        /// Descripción:
+        /// Verifica si el llamador es un administrador. Si no, retorna un error indicando que no es administrador.
+        /// Obtiene al siguiente usuario pendiente en la lista de usuarios pendientes.
+        /// Retorna un mensaje de éxito con el nombre, apellido y DNI del usuario pendiente si existe.
+        /// Si no hay usuarios pendientes, retorna un error indicando que no hay usuarios pendientes.
+   
         #[ink(message)]
         pub fn obtener_informacion_siguiente_usuario_pendiente(&self) -> Result<String, String>
         {
@@ -436,20 +420,15 @@ mod TrabajoFinal {
                 None => Err(String::from("No hay usuarios pendientes.")),
             }
         }
+        /// Procesa el siguiente usuario pendiente, aceptándolo o rechazándolo.
+        /// - aceptar_usuario: bool - Indica si se acepta (true) o se rechaza (false) al usuario pendiente.
+        /// Descripción:
+        /// Verifica si el llamador es un administrador. Si no, retorna un error indicando que no es administrador.
+        /// Obtiene al siguiente usuario pendiente en la lista. Si no hay usuarios pendientes, retorna un error.
+        /// Si se acepta al usuario, lo mueve desde la lista de usuarios pendientes a la lista de usuarios.
+        /// Si se rechaza al usuario, lo agrega a la lista de usuarios rechazados.
+        /// Retorna un mensaje de éxito indicando si el usuario fue agregado o rechazado exitosamente.
 
-        /*
-    Procesa al siguiente usuario pendiente para aprobar o rechazar su registro en el sistema.
-    Solo puede ser utilizada por un administrador.
-    
-    Parámetros
-    aceptar_usuario (bool): Indica si se acepta (true) o rechaza (false) al usuario pendiente.
-    Retorno
-        Result<String, String>:
-            Ok("Usuario agregado exitosamente."): Si el usuario fue aceptado.
-            Ok("Usuario rechazado exitosamente."): Si el usuario fue rechazado.
-            Err("No hay usuarios pendientes."): Si no hay usuarios pendientes.
-            Err("No es administrador."): Si quien llama a la función no es administrador.
-         */
         #[ink(message)]
         pub fn procesar_siguiente_usuario_pendiente(&mut self, aceptar_usuario:bool) -> Result<String, String>
         {
@@ -478,21 +457,17 @@ mod TrabajoFinal {
 
         // ====-----==== METODOS ADMINISTRADOR ====----====
 
-    /*
-    Crea una nueva elección con fechas de inicio y fin especificadas. Solo puede ser utilizada por un administrador.
-
-    Parámetros
-    fecha_inicial (String): Fecha y hora de inicio de la elección en formato dd-mm-YYYY hh:mm.
-    fecha_final (String): Fecha y hora de finalización de la elección en formato dd-mm-YYYY hh:mm.
-
-    Retorno
-    Result<String, String>:
-        Ok("Eleccion creada exitosamente. Id de la elección: {id}"): Si la elección se creó exitosamente.
-        Err("Error en el formato de la fecha inicial. Formato: dd-mm-YYYY hh:mm"): Si la fecha inicial tiene un formato incorrecto.
-        Err("Error en el formato de la fecha final. Formato: dd-mm-YYYY hh:mm"): Si la fecha final tiene un formato incorrecto.
-        Err("Se produjo un overflow al intentar crear una elección."): Si ocurre un error de overflow al crear el ID de la elección.
-        Err("No es administrador."): Si quien llama a la función no es administrador.
-     */
+        /// Crea una nueva elección con las fechas especificadas.
+        /// - fecha_inicial: String - Fecha y hora de inicio en formato "dd-mm-YYYY hh:mm".
+        /// - fecha_final: String - Fecha y hora de finalización en formato "dd-mm-YYYY hh:mm".
+        /// Result<String, String>: Mensaje de éxito con el ID de la elección creada o mensaje de error.
+        /// Descripción:
+        /// Verifica si el llamador es un administrador. Si no, retorna un error indicando que no es administrador.
+        /// Parsea las fechas iniciales y finales proporcionadas en formato específico. Retorna un error si el formato no es válido.
+        /// Genera un nuevo ID para la elección basado en el tamaño actual de la lista de elecciones.
+        /// Crea una nueva instancia de `Eleccion` con los parámetros dados y la agrega a la lista de elecciones.
+        /// Retorna un mensaje de éxito indicando que la elección fue creada exitosamente junto con el ID de la elección.
+    
         #[ink(message)]
         pub fn crear_eleccion(&mut self, fecha_inicial:String, fecha_final:String) -> Result<String, String>
         {
@@ -531,21 +506,17 @@ mod TrabajoFinal {
             return Ok(format!("Eleccion creada exitosamente. Id de la elección: {}", eleccion_id));
         }
 
-                
-        /*
-        Permite al administrador iniciar una votación si la fecha actual es posterior a la fecha inicial establecida y la votación aún no ha comenzado.
-        Parámetros
-        eleccion_id (u64): El ID de la elección que se quiere iniciar.
+        /// Permite al administrador iniciar una votación si la fecha actual es posterior a la fecha inicial establecida y la votación aún no ha comenzado.
+        /// Inicia la votación de una elección.
+        /// - eleccion_id: u64 - ID de la elección que se desea iniciar.
+        /// Descripción:
+        /// Verifica si el llamador es un administrador. Si no, retorna un error indicando que no es administrador.
+        /// Obtiene la elección correspondiente al ID proporcionado y verifica las condiciones para iniciar la votación:
+        /// - Si el tiempo actual es posterior a la fecha de finalización de la elección, retorna un error indicando que la votación ya finalizó.
+        /// - Si la votación ya está iniciada, retorna un error indicando que la votación ya inició.
+        /// - Si el tiempo actual es anterior a la fecha de inicio de la elección, retorna un error indicando que todavía no es la fecha para la votación.
+        /// Si todas las condiciones son satisfactorias, marca la votación como iniciada y retorna un mensaje de éxito.
 
-        Retorno
-        Result<String, String>:
-            Ok("Se inició la votación exitosamente."): Si la votación se inició correctamente.
-            Err("La votación ya finalizó."): Si la fecha actual es posterior a la fecha final de la votación.
-            Err("La votación ya inició."): Si la votación ya ha sido iniciada previamente.
-            Err("Todavía no es la fecha para la votación."): Si la fecha actual es anterior a la fecha de inicio establecida.
-            Err("No existe una elección con ese id."): Si no se encuentra una elección con el ID especificado.
-            Err("No es administrador."): Si quien llama a la función no es administrador.
-         */
         #[ink(message)]
         pub fn iniciar_votacion(&mut self, eleccion_id:u64) -> Result<String, String>
         {
@@ -574,18 +545,15 @@ mod TrabajoFinal {
             }
         }
 
-       /*
-    Permite al administrador obtener información del siguiente usuario pendiente en una elección específica.
-    Parámetros
-        eleccion_id (u64): El ID de la elección de la cual se quiere obtener el siguiente usuario pendiente.
-
-    Retorno
-    Result<String, String>:
-        Ok("Usuario: {datos_usuario}"): Con información del siguiente usuario pendiente.
-        Err("No hay usuarios pendientes."): Si no hay usuarios pendientes en la elección.
-        Err("Eleccion no encontrada"): Si no se encuentra una elección con el ID especificado.
-        Err("No es administrador."): Si quien llama a la función no es administrador.
-    */
+        /// Permite al administrador obtener información del siguiente usuario pendiente en una elección específica.
+        /// Obtiene información del siguiente usuario pendiente en una elección.
+        /// - eleccion_id: u64 - ID de la elección de la cual se desea obtener el siguiente usuario pendiente
+        /// Result<String, String>: Mensaje con los datos del usuario pendiente o un mensaje de error si no hay usuarios pendientes.
+        /// Descripción:
+        /// Verifica si el llamador es un administrador. Si no, retorna un error indicando que no es administrador.
+        /// Obtiene la elección correspondiente al ID proporcionado y luego obtiene la información del primer usuario pendiente
+        /// en la lista de usuarios pendientes de esa elección. Retorna un mensaje con los datos del usuario pendiente si existe,
+        /// indicando si desea ser un VOTANTE o un CANDIDATO. Retorna un mensaje de error si no hay usuarios pendientes.
         #[ink(message)]
         pub fn obtener_siguiente_usuario_pendiente_en_una_eleccion(&mut self, eleccion_id:u64) -> Result<String, String>
         {
@@ -612,22 +580,16 @@ mod TrabajoFinal {
                 None => Err(String::from("No hay usuarios pendientes.")),
             }
         }
-        /*
-    Permite al administrador procesar el siguiente usuario pendiente en una elección específica.
-     Según el parámetro aceptar_usuario, el usuario será aceptado o rechazado.
-     
-    Parámetros
-        eleccion_id (u64): El ID de la elección en la que se quiere procesar el siguiente usuario pendiente.
-        aceptar_usuario (bool): Indica si se acepta (true) o rechaza (false) al usuario.
+        
+        /// Permite al administrador procesar el siguiente usuario pendiente en una elección específica.
+        /// Parámetros:
+        /// - eleccion_id: u64 - ID de la elección en la que se procesarán los usuarios pendientes.
+        /// - aceptar_usuario: bool - Indica si se acepta (true) o se rechaza (false) al usuario pendiente.
+        /// Descripción:
+        /// Verifica si el llamador es un administrador. Si no, retorna un error indicando que no es administrador.
+        /// Obtiene la elección correspondiente al ID proporcionado. Luego, procesa el siguiente usuario pendiente
+        /// en la elección según la acción indicada (aceptar o rechazar) y retorna el resultado del procesamiento.
 
-    Retorno
-        Result<String, String>:
-            Ok("Usuario agregado exitosamente."): Si el usuario se acepta y se agrega a la elección.
-            Ok("Usuario rechazado exitosamente."): Si el usuario se rechaza.
-            Err("No hay usuarios pendientes."): Si no hay usuarios pendientes en la elección.
-            Err("Elección no encontrada"): Si no se encuentra una elección con el ID especificado.
-            Err("No es administrador."): Si quien llama a la función no es un administrador.
-         */
         #[ink(message)]
         pub fn procesar_usuarios_en_una_eleccion(&mut self, eleccion_id:u64,aceptar_usuario:bool) -> Result<String, String>
         {
@@ -646,23 +608,14 @@ mod TrabajoFinal {
 
         // ====-----==== METODOS PÚBLICOS ====----====
 
-        /*
-        Permite a un usuario registrado ingresar a una elección como candidato o votante. La función verifica que la elección no haya comenzado
-         o terminado antes de permitir el ingreso.
-        Parámetros
-            eleccion_id (u64): El ID de la elección a la cual se quiere ingresar.
-            tipo (TIPO_DE_USUARIO): El tipo de usuario que desea ingresar, puede ser VOTANTE o CANDIDATO.
-
-        Retorno
-        Result<String, String>:
-            Ok("Ingresó a la elección correctamente. Pendiente de aprobación del Administrador."): Si el usuario ingresó correctamente a la elección y está pendiente de aprobación.
-            Err("Ya has sido rechazado no puedes ingresar a la elección."): Si el usuario ya ha sido rechazado en esta elección previamente.
-            Err("No puedes ingresar dos veces a la misma elección."): Si el usuario ya está pendiente en esta elección.
-            Err("Elección no encontrada"): Si no se encuentra una elección con el ID especificado.
-            Err("La votación ya inició."): Si la elección ya ha comenzado.
-            Err("La votación ya finalizó."): Si la elección ya ha terminado.
-            Err("No es usuario registrado."): Si quien llama a la función no es un usuario registrado.
-         */
+        /// Ingresa al usuario actual a una elección como pendiente de aprobación.
+        /// - eleccion_id: u64 - ID de la elección a la que se desea ingresar.
+        /// - tipo: TIPO_DE_USUARIO - Tipo de usuario que desea ingresar (VOTANTE o CANDIDATO).
+        /// Descripción:
+        /// Verifica si el usuario está registrado. Obtiene el ID del usuario actual y el timestamp actual del bloque.
+        /// Valida el estado actual de la elección y verifica si el usuario ya ha sido rechazado previamente o si ya está pendiente.
+        /// Luego, agrega al usuario como pendiente en la elección y retorna un mensaje de éxito.
+    
         #[ink(message)]
         pub fn ingresar_a_eleccion(&mut self, eleccion_id:u64, tipo:TIPO_DE_USUARIO) -> Result<String, String>
         {
@@ -693,23 +646,14 @@ mod TrabajoFinal {
             return Ok(String::from("Ingresó a la elección correctamente Pendiente de aprobacion del Administrador"));
         }
         
-        /*
-    Permite a un usuario registrado y habilitado como votante emitir su voto para un candidato en una elección específica.
-    Verifica que el usuario esté autorizado para votar y que la votación esté en curso.
-    Parámetros
-        eleccion_id (u64): El ID de la elección en la que se desea votar.
-        candidato_id (u32): El ID del candidato por el cual se desea votar.
-
-    Retorno
-        Result<String, String>:
-            Ok("Voto registrado correctamente."): Si el voto se registra correctamente.
-            Err("Todavía no es la fecha para la votación."): Si la fecha actual es anterior a la fecha de inicio de la votación.
-            Err("La votación ya finalizó."): Si la fecha actual es posterior a la fecha final de la votación.
-            Err("No existe una elección con ese id."): Si no se encuentra una elección con el ID especificado.
-            Err("No es usuario registrado."): Si quien llama a la función no es un usuario registrado.
-            Err("No estás habilitado para votar en esta elección."): Si el usuario no está habilitado como votante en la elección.
-            Err("Ya has votado en esta elección."): Si el usuario ya emitió su voto en esta elección.
-         */
+    /// Realiza el voto a un candidato en una elección específica.
+    /// - eleccion_id: u64 - ID de la elección.
+    /// - candidato_id: u32 - ID del candidato.
+    /// Descripción:
+    /// Verifica si el usuario está registrado. Obtiene el ID del votante y el timestamp actual del bloque.
+    /// Luego, verifica si la elección existe y si la votación está activa y en el período correcto.
+    /// Finalmente, llama al método de votar_candidato de la elección y retorna su resultado.
+   
         #[ink(message)]
         pub fn votar_a_candidato(&mut self, eleccion_id:u64, candidato_id:u32) -> Result<String, String>
         {
@@ -739,18 +683,14 @@ mod TrabajoFinal {
             }
         }
 
-        /*
-    Permite obtener los datos de un candidato en particular dentro de una elección específica.
-    Parámetros
-        eleccion_id (u64): El ID de la elección de la cual se quiere obtener la información del candidato.
-        candidato_id (u32): El ID del candidato del cual se desea obtener información.
-
-    Retorno
-    Result<String, String>:
-        Ok("Nombre: {nombre}\nApellido: {apellido}\nDNI: {dni}"): Si la información del candidato se obtiene correctamente.
-        Err("Elección no encontrada."): Si no se encuentra una elección con el ID especificado.
-        Err("Candidato no encontrado."): Si no se encuentra un candidato con el ID especificado.
-     */
+    /// Obtiene la información de un candidato en una elección específica.
+    /// - eleccion_id: u64 - ID de la elección.
+    /// - candidato_id: u32 - ID del candidato.
+    /// Result<String, String>: Información del candidato o mensaje de error.
+    /// Descripción:
+    /// Busca la elección por su ID y luego obtiene la información del candidato.
+    /// Retorna un mensaje con el nombre, apellido y DNI del candidato si está registrado;
+    /// de lo contrario, retorna un error.
         #[ink(message)]
         pub fn obtener_informacion_candidato_eleccion(&self, eleccion_id:u64, candidato_id:u32) -> Result<String, String>
         {
