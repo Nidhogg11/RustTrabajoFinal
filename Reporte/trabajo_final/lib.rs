@@ -86,12 +86,13 @@ mod TrabajoFinal {
     }
 
     impl Eleccion
-    {   
-        //Verifica si el id pasado por parametro esta en la lista de usuarios pendientes de la eleccion
+    {
+        /// Este método verifica si hay un usuario pendiente con el ID especificado en la lista de usuarios pendientes.
         fn contiene_usuario_pendiente(&self, id: AccountId) -> bool {
             self.usuarios_pendientes.iter().any(|(usuario_id, _tipo)| *usuario_id == id)
         }
-        //Verifica si el id pasado por parametro es un candidato de la eleccion 
+
+        /// Este método verifica si existe un candidato con el ID especificado dentro de la lista de candidatos disponibles.
         fn existe_candidato(&self, candidato_id:u32) -> bool
         {
             candidato_id >= 1 && candidato_id <= self.candidatos.len() as u32
@@ -147,9 +148,10 @@ mod TrabajoFinal {
             }
         }
 
-        ///Usado por el administrador.
-        ///Revisa el primer usuario pendiente.
-        ///Lo envia al Vec candidato si es candidato, o votante en caso contrario.
+        /// Usado por el administrador.
+        /// Revisa el primer usuario pendiente.
+        /// Lo envia al Vec candidato si es candidato, o votante en caso contrario.
+        /// Agrega votantes o candidatos al sistema y gestiona errores de desbordamiento para las IDs de candidatos.
         pub fn procesar_siguiente_usuario_pendiente(&mut self, aceptar_usuario:bool) -> Result<String, String>
         {
             let sig_usuario = self.usuarios_pendientes.first();
@@ -777,7 +779,11 @@ mod TrabajoFinal {
         // ====-----==== METODOS USADOS POR EL ADMINISTRADOR ====----====
 
         /// Utilizado por un administrador.
-        /// Activa el registro de usuarios si no está activo el registro.
+        /// Activa el registro de usuarios.
+        /// Descripción:
+        /// Verifica si el llamador es un administrador. Si no, retorna un error indicando que no es administrador.
+        /// Luego, verifica si el registro ya está activado. Si es así, retorna un error. Si no, activa el registro 
+        /// y retorna un mensaje de éxito.
         #[ink(message)]
         pub fn activar_registro(&mut self) -> Result<String, String>
         {
@@ -793,6 +799,10 @@ mod TrabajoFinal {
 
         /// Utilizado por un administrador.
         /// Desactiva el registro de usuarios si no está activo el registro.
+        /// Descripción:
+        /// Verifica si el llamador es un administrador. Si no, retorna un error indicando que no es administrador.
+        /// Luego, verifica si el registro ya está desactivado. Si es así, retorna un error. Si no, desactiva el
+        /// registro y retorna un mensaje de éxito.
         #[ink(message)]
         pub fn desactivar_registro(&mut self) -> Result<String, String>
         {
@@ -807,7 +817,11 @@ mod TrabajoFinal {
         }
 
         /// Utilizado por el administrador.
-        /// Permite al administrador transferir el rol de administrador a otra persona.
+        /// Permite al administrador transferir el rol de administrador a otro usuario.
+        /// id: AccountId: ID del nuevo administrador.
+        /// Descripción:
+        ///Verifica si el llamador es un administrador. Si no, retorna un error indicando que no es administrador.
+        ///  Si es administrador, asigna el ID proporcionado como el nuevo administrador y retorna un mensaje de éxito.
         #[ink(message)]
         pub fn transferir_administrador(&mut self, id:AccountId) -> Result<String, String>
         {
@@ -822,6 +836,10 @@ mod TrabajoFinal {
         
         /// Utilizado por el administrador.
         /// Permite al administrador asignar un generador de reportes.
+        /// id: AccountId: ID del nuevo generador de reportes.
+        /// Descripción:
+        /// Verifica si el llamador es un administrador. Si no, retorna un error indicando que no es administrador.
+        ///  Si es administrador, asigna el ID proporcionado como el nuevo generador de reportes y retorna un mensaje de éxito.
         #[ink(message)]
         pub fn asignar_generador_reportes(&mut self, id:AccountId) -> Result<String, String>
         {
@@ -838,8 +856,13 @@ mod TrabajoFinal {
         // ====-----==== METODOS PARA EL GENERADOR DE REPORTES ====----====
         // ====-----==== METODOS PARA EL GENERADOR DE REPORTES ====----====
 
+
         /// Utilizado por el generador de reportes asignado por el administrador.
         /// Obtiene la informacion del usuario especificado por AccountId
+        /// user_id: AccountId: ID del usuario.
+        /// Option<(String, String, String)>: Tupla con nombre, apellido y DNI del usuario, o None si no se encuentra o el llamador no es el generador de reportes.
+        /// Verifica si el llamador tiene permiso para generar reportes. Si no, retorna None. Luego, busca el usuario por su ID en la lista de usuarios.
+        /// Si el usuario es encontrado, retorna su nombre, apellido y DNI como una tupla. Si no, retorna None.
         #[ink(message)]
         pub fn obtener_informacion_usuario(&self, user_id: AccountId) -> Option<(String, String, String)> 
         {
@@ -857,9 +880,13 @@ mod TrabajoFinal {
         }
 
         /// Utilizado por el generador de reportes asignado por el administrador.
-        /// Cuando una elección especificada por parametro ya finalizó, el generador de reportes puede obtener un vector con 
-        /// todos los votantes y si emitieron el voto o no.
-        /// Si la eleccion no existe devuelve "La eleccion enviada no existe!"
+        /// Obtiene la lista de votantes y su estado de voto para una elección específica.
+        /// eleccion_id: u64: ID de la elección.
+        /// Result<Vec<(AccountId,u32)>, String>: Vector con el ID de cada candidato y su total de votos, o un mensaje de error.
+        /// Descripción:
+        /// La función verifica si el usuario es el generador de reportes. Si no lo es, devuelve un error. Obtiene la marca de tiempo
+        ///  del bloque actual y verifica si la elección ha finalizado. Si la elección no ha terminado, devuelve un error. Si la elección
+        ///  existe y ha finalizado, devuelve la lista de votantes con su estado de voto. Si la elección no existe, devuelve un error.
         #[ink(message)]
         pub fn obtener_votantes_eleccion_por_id(&mut self, eleccion_id: u64) -> Result<Vec<(AccountId,bool)>, String>
         {
@@ -883,10 +910,16 @@ mod TrabajoFinal {
             }
         }
 
-         /// Utilizado por el generador de reportes asignado por el administrador.
-         /// Cuando una elección especificada por parametro ya finalizó, el generador de reportes puede obtener un vector con 
-        /// todos los candidatos y los votos totales que obtivieron.
-        /// Si la eleccion no existe devuelve "La eleccion enviada no existe!"
+
+        /// Utilizado por el generador de reportes asignado por el administrador.
+        /// Obtiene la lista de candidatos y sus votos para una elección específica.
+        /// eleccion_id: u64: ID de la elección.
+        /// Result<Vec<(AccountId,u32)>, String>: Vector con el ID de cada candidato y su total de votos, o un mensaje de error.
+        /// Descripción:
+        /// La función verifica si el usuario es el generador de reportes. Si no lo es, devuelve un error. Obtiene la marca de tiempo del
+        /// bloque actual y verifica si la elección ha finalizado. Si la elección no ha terminado, devuelve un error. Si la elección existe
+        /// y ha finalizado, devuelve la lista de candidatos con sus votos. Si la elección no existe, devuelve un error.
+
         #[ink(message)]
         pub fn obtener_candidatos_eleccion_por_id(&mut self, eleccion_id: u64) -> Result<Vec<(AccountId,u32)>, String>
         {
@@ -909,7 +942,13 @@ mod TrabajoFinal {
             }
         }
 
-        /// FALTA DOCUMENTACIÓN
+        /// Obtiene los resultados de una elección específica.
+        /// eleccion_id: u64: ID de la elección.
+        /// Result<Vec<(AccountId,u32)>, String>: Vector con el ID de cada candidato y su total de votos, o un mensaje de error.
+        /// Descripción:
+        /// La función obtiene la marca de tiempo del bloque actual y busca la elección por su ID. Si no encuentra la elección,
+        /// devuelve un error. Luego, intenta obtener los resultados de la votación usando la marca de tiempo. Si los resultados
+        /// aún no están disponibles, devuelve un error. Si están disponibles, devuelve una copia de los resultados.
         #[ink(message)]
         pub fn obtener_resultados(&mut self, eleccion_id:u64) -> Result<Resultados, String> 
         {
