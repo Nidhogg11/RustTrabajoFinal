@@ -1,2 +1,5 @@
 [workspace]
-members = ["Reporte/","Reporte/trabajo_final/"]
+members = [
+    "reporte",
+    "sistema-elecciones"
+]

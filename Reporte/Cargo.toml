@@ -1,19 +1,19 @@
 [package]
-name = "Reporte"
-version = "0.1.0"
-authors = ["[your_name] <[your_email]>"]
+name = "reporte"
+version = "0.0.1"
+authors = ["Grupo 5"]
 edition = "2021"
+publish = false
 
 [dependencies]
-chrono = { version = "0.4.38", default-features = false }
-ink = { version = "4.2.9", default-features = false }
+ink = { version = "4.3.0", default-features = false }
 scale = { package = "parity-scale-codec", version = "3", default-features = false, features = ["derive"] }
 scale-info = { version = "2.3", default-features = false, features = ["derive"] }
-TrabajoFinal = { path = "trabajo_final", default-features = false, features = ["ink-as-dependency"] }
 
+sistema-elecciones = { path = "../sistema-elecciones", default-features = false, features = ["ink-as-dependency"] }
 
 [dev-dependencies]
-ink_e2e = { version = "5.0.0" }
+# ink_e2e = { version = "4.3.0" }
 
 [lib]
 path = "lib.rs"
@@ -24,7 +24,8 @@ std = [
     "ink/std",
     "scale/std",
     "scale-info/std",
-    "TrabajoFinal/std"
+    "sistema-elecciones/std",
 ]
 ink-as-dependency = []
 e2e-tests = []
+
